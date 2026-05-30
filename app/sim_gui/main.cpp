@@ -129,17 +129,20 @@ int main(int, char**)
 
     EngineVoice::LayerConfig onload_configs[kNumOnload];
     for (int i = 0; i < kNumOnload; ++i) {
-        onload_configs[i] = { kOnloadLayers[i].rpm, onload_data[i].data(),
-            onload_data[i].size() };
+        onload_configs[i].rpm = kOnloadLayers[i].rpm;
+        onload_configs[i].data = onload_data[i].data();
+        onload_configs[i].length = onload_data[i].size();
     }
     EngineVoice::LayerConfig offload_configs[kNumOffload];
     for (int i = 0; i < kNumOffload; ++i) {
-        offload_configs[i] = { kOffloadLayers[i].rpm, offload_data[i].data(),
-            offload_data[i].size() };
+        offload_configs[i].rpm = kOffloadLayers[i].rpm;
+        offload_configs[i].data = offload_data[i].data();
+        offload_configs[i].length = offload_data[i].size();
     }
 
-    audio_state.engine.set_onload_layers(onload_configs, kNumOnload);
-    audio_state.engine.set_offload_layers(offload_configs, kNumOffload);
+    // Use auto-envelope: generates trapezoidal volume + per-layer pitch ranges
+    audio_state.engine.set_onload_layers_auto(onload_configs, kNumOnload);
+    audio_state.engine.set_offload_layers_auto(offload_configs, kNumOffload);
     audio_state.engine.set_engine_config(kCylinders, kDefaultSampleRate);
     audio_state.mixer.set_master_volume(0.8f);
 
