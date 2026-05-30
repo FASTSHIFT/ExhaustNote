@@ -16,6 +16,7 @@
 
 // BSP and driver includes
 extern "C" {
+#include "at_surf_f437_board_joystick.h"
 #include "at_surf_f437_board_key.h"
 #include "at_surf_f437_board_pca9555.h"
 #include "at_surf_f437_board_sdram.h"
@@ -68,6 +69,13 @@ static sample_t g_pulse_sample[512];
 // SDRAM memory pool for WAV samples
 static SdramPool g_sdram_pool;
 static LoadedCar g_car;
+
+// Car list (scanned from SD card)
+#define MAX_CARS 16
+#define CAR_BASE_DIR "1:/ExhaustNote"
+static sd_car_entry_t g_car_list[MAX_CARS];
+static uint8_t g_car_count = 0;
+static uint8_t g_car_index = 0;
 
 // ============================================================
 // Sine wave fallback (500ms beep then silence)
@@ -203,8 +211,9 @@ static void system_init(void)
     pca9555_init(PCA_I2C_CLKCTRL_100K);
     Serial.println(" OK");
 
-    // Keys
+    // Keys + Joystick
     key_init();
+    joystick_init();
 
     // Variable resistor (ADC for throttle)
     variable_resistor_init();
@@ -314,9 +323,25 @@ int main(void)
     g_btn_up.setEventCallback(on_button_event);
     g_btn_down.setEventCallback(on_button_event);
 
-    // Try to load car from SD card
-    const char* car_dir = "1:/ExhaustNote/ferrari_458";
-    bool car_ok = load_car_from_sd(car_dir);
+    // Scan available cars on SD card
+    g_car_count = sd_scan_cars(CAR_BASE_DIR, g_car_list, MAX_CARS);
+    Serial.print("[SCAN] Found ");
+    Serial.print(g_car_count);
+    Serial.println(" cars:");
+    for (uint8_t i = 0; i < g_car_count; i++) {
+        Serial.print("  [");
+        Serial.print(i);
+        Serial.print("] ");
+        Serial.println(g_car_list[i].name);
+    }
+
+    // Load first car
+    bool car_ok = false;
+    if (g_car_count > 0) {
+        char car_path[64];
+        snprintf(car_path, sizeof(car_path), "%s/%s", CAR_BASE_DIR, g_car_list[0].name);
+        car_ok = load_car_from_sd(car_path);
+    }
 
     // Start audio output
     Serial.print("[INIT] Starting I2S DMA...");
@@ -336,6 +361,7 @@ int main(void)
     // Main loop — time-based scheduling via millis()
     uint32_t last_physics_ms = millis();
     uint32_t last_button_ms = millis();
+    uint32_t last_joy_ms = millis();
     uint32_t last_print_ms = millis();
 
     while (1) {
@@ -346,6 +372,29 @@ int main(void)
             last_button_ms = now;
             g_btn_up.monitor(digitalRead(PIN_KEY1) == HIGH);
             g_btn_down.monitor(digitalRead(PIN_KEY2) == HIGH);
+        }
+
+        // Car switch: both buttons pressed simultaneously → next car
+        if (now - last_joy_ms >= 200) {
+            last_joy_ms = now;
+            if (g_car_count > 1 && digitalRead(PIN_KEY1) == HIGH && digitalRead(PIN_KEY2) == HIGH) {
+                g_car_index = (g_car_index + 1) % g_car_count;
+                g_engine_running = false;
+                audio_i2s_stop();
+                char car_path[64];
+                snprintf(car_path, sizeof(car_path), "%s/%s", CAR_BASE_DIR, g_car_list[g_car_index].name);
+                Serial.print("[SWITCH] -> ");
+                Serial.println(g_car_list[g_car_index].name);
+                if (load_car_from_sd(car_path)) {
+                    g_engine_running = true;
+                    g_params.rpm = g_car.rpm_idle;
+                    g_params.throttle = 0.0f;
+                    g_params.load = 0.0f;
+                    g_engine.reset();
+                }
+                audio_i2s_start();
+                last_joy_ms = millis() + 500; // Cooldown
+            }
         }
 
         // Physics update @ 1kHz (every 1ms)

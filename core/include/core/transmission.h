@@ -17,6 +17,7 @@ public:
         float final_drive = 3.73f;
         float rpm_upshift = 0.85f; ///< Upshift at this fraction of redline
         float rpm_downshift = 0.35f; ///< Downshift at this fraction of redline
+        bool auto_shift = false; ///< Enable automatic gear shifting
         float rpm_idle = 800.0f;
         float rpm_redline = 8000.0f;
 

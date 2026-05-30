@@ -46,6 +46,18 @@ uint32_t sd_wav_load(const char* path, int16_t* buf, uint32_t buf_max, sd_wav_in
 /// @return Number of bytes read, or 0 on error
 uint32_t sd_read_file(const char* path, char* buf, uint32_t buf_size);
 
+/// Car directory entry for scanning.
+typedef struct {
+    char name[32]; ///< Directory name (e.g. "ferrari_458")
+} sd_car_entry_t;
+
+/// Scan a directory for car subdirectories (those containing car.json).
+/// @param base_dir   FatFS path to scan (e.g. "1:/ExhaustNote")
+/// @param entries    Output array of car entries
+/// @param max_entries Maximum entries to return
+/// @return Number of cars found
+uint8_t sd_scan_cars(const char* base_dir, sd_car_entry_t* entries, uint8_t max_entries);
+
 #ifdef __cplusplus
 }
 #endif

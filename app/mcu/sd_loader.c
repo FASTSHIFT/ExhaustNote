@@ -170,3 +170,43 @@ uint32_t sd_read_file(const char* path, char* buf, uint32_t buf_size)
     f_close(&file);
     return bytes_read;
 }
+
+uint8_t sd_scan_cars(const char* base_dir, sd_car_entry_t* entries, uint8_t max_entries)
+{
+    DIR dir;
+    FILINFO fno;
+    FIL test_file;
+    uint8_t count = 0;
+    char path_buf[128];
+
+    if (f_opendir(&dir, base_dir) != FR_OK) {
+        return 0;
+    }
+
+    while (count < max_entries) {
+        if (f_readdir(&dir, &fno) != FR_OK || fno.fname[0] == 0) {
+            break; // End of directory
+        }
+
+        // Skip non-directories and hidden/system entries
+        if (!(fno.fattrib & AM_DIR)) {
+            continue;
+        }
+        if (fno.fname[0] == '.') {
+            continue;
+        }
+
+        // Check if this directory contains car.json
+        snprintf(path_buf, sizeof(path_buf), "%s/%s/car.json", base_dir, fno.fname);
+        if (f_open(&test_file, path_buf, FA_READ) == FR_OK) {
+            f_close(&test_file);
+            // Valid car directory
+            strncpy(entries[count].name, fno.fname, sizeof(entries[count].name) - 1);
+            entries[count].name[sizeof(entries[count].name) - 1] = '\0';
+            count++;
+        }
+    }
+
+    f_closedir(&dir);
+    return count;
+}

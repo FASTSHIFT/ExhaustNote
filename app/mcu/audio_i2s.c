@@ -166,7 +166,7 @@ static void i2s_dma_init(void)
     // Enable half-transfer and full-transfer interrupts
     dma_interrupt_enable(I2S_DMA_TX_CHANNEL, DMA_HDT_INT, TRUE);
     dma_interrupt_enable(I2S_DMA_TX_CHANNEL, DMA_FDT_INT, TRUE);
-    nvic_irq_enable(DMA1_Channel3_IRQn, 0, 0); // Highest priority
+    nvic_irq_enable(DMA1_Channel3_IRQn, 2, 0); // Priority 2 (I2C=0, SDIO=1 can preempt)
 
     // I2S2: Master TX, 16-bit, Phillips, 44.1kHz
     spi_i2s_reset(I2S_SPIx);

@@ -173,12 +173,14 @@ void Transmission::update(float throttle, float dt)
     }
     afterfire_ = std::fmax(0.0f, std::fmin(1.0f, afterfire_));
 
-    // --- Auto shift logic ---
-    float rpm_fraction = (rpm_ - config_.rpm_idle) / (config_.rpm_redline - config_.rpm_idle);
-    if (rpm_fraction >= config_.rpm_upshift && gear_ < config_.num_gears) {
-        shift_up();
-    } else if (rpm_fraction <= config_.rpm_downshift && gear_ > 1) {
-        shift_down();
+    // --- Auto shift logic (only if enabled) ---
+    if (config_.auto_shift) {
+        float rpm_fraction = (rpm_ - config_.rpm_idle) / (config_.rpm_redline - config_.rpm_idle);
+        if (rpm_fraction >= config_.rpm_upshift && gear_ < config_.num_gears) {
+            shift_up();
+        } else if (rpm_fraction <= config_.rpm_downshift && gear_ > 1) {
+            shift_down();
+        }
     }
 }
 
