@@ -96,8 +96,13 @@ static void generate_sine(int16_t* buffer, size_t frames)
 // ============================================================
 // Audio processing (called from DMA ISR via audio_i2s callback)
 // ============================================================
+static volatile uint32_t g_isr_cycles = 0; // DWT cycle count of last ISR
+static volatile uint32_t g_isr_count = 0;
+
 static void process_audio(int16_t* buffer, uint32_t frames)
 {
+    uint32_t t0 = DWT->CYCCNT;
+    (void)t0; // used at end
     if (!g_engine_running) {
         // Phase 1: output sine wave for testing
         generate_sine(buffer, frames);
@@ -111,29 +116,32 @@ static void process_audio(int16_t* buffer, uint32_t frames)
     if (params.rpm < 500.0f)
         params.rpm = 500.0f;
 
+    // Static buffers — avoid stack allocation in ISR
+    static sample_t engine_buf[AUDIO_BUFFER_SIZE];
+    static float effects_buf[AUDIO_BUFFER_SIZE];
+
     // Process engine voice
-    sample_t engine_buf[AUDIO_BUFFER_SIZE];
     g_engine.process(params, engine_buf, frames);
 
-    // Combustion pulses
-    float effects_buf[AUDIO_BUFFER_SIZE] = {};
+    // Combustion pulses (clear first)
+    memset(effects_buf, 0, frames * sizeof(float));
     g_combustion.process(effects_buf, frames, params.rpm, AUDIO_SAMPLE_RATE);
 
-    // Mix
+    // Mix engine + effects → output
     g_mixer.clear(frames);
     g_mixer.add(engine_buf, frames, 1.0f);
 
-    sample_t pulse_buf[AUDIO_BUFFER_SIZE];
+    // Convert float effects to int16 and add
     for (size_t i = 0; i < frames; ++i) {
         float s = effects_buf[i];
-        if (s > 32767.0f)
-            s = 32767.0f;
-        if (s < -32768.0f)
-            s = -32768.0f;
-        pulse_buf[i] = static_cast<sample_t>(s);
+        s = s > 32767.0f ? 32767.0f : (s < -32768.0f ? -32768.0f : s);
+        engine_buf[i] = static_cast<sample_t>(s); // reuse buffer
     }
-    g_mixer.add(pulse_buf, frames, 1.0f);
+    g_mixer.add(engine_buf, frames, 1.0f);
     g_mixer.finalize(buffer, frames);
+
+    g_isr_cycles = DWT->CYCCNT - t0;
+    g_isr_count++;
 }
 
 // DMA IRQ handler is in audio_i2s.c — it calls process_audio() via callback
@@ -256,14 +264,57 @@ static bool load_car_from_sd(const char* car_dir)
 }
 
 // ============================================================
+// Input — ButtonEvent + analogRead
+// ============================================================
+#include "ButtonEvent.h"
+
+#define PIN_THROTTLE PA5 // Variable resistor (ADC channel 5)
+#define PIN_KEY1 PA0 // Shift up (active high, pull-down)
+#define PIN_KEY2 PC13 // Shift down (active high, pull-down)
+
+static ButtonEvent g_btn_up;
+static ButtonEvent g_btn_down;
+
+static void on_button_event(ButtonEvent* btn, ButtonEvent::Event_t event)
+{
+    if (event != ButtonEvent::EVENT_CLICKED)
+        return;
+
+    if (btn == &g_btn_up) {
+        g_transmission.shift_up();
+        Serial.print("[GEAR] UP -> ");
+        Serial.println(g_transmission.gear());
+    } else if (btn == &g_btn_down) {
+        g_transmission.shift_down();
+        Serial.print("[GEAR] DOWN -> ");
+        Serial.println(g_transmission.gear());
+    }
+}
+
+static uint32_t tick_getter(void)
+{
+    return millis();
+}
+
+// ============================================================
 // Main
 // ============================================================
 int main(void)
 {
     system_init();
 
+    // Configure input pins
+    pinMode(PIN_THROTTLE, INPUT_ANALOG_DMA);
+    pinMode(PIN_KEY1, INPUT_PULLDOWN);
+    pinMode(PIN_KEY2, INPUT_PULLDOWN);
+    ADC_DMA_Init();
+
+    // Setup ButtonEvent
+    ButtonEvent::setTickGetterCallback(tick_getter);
+    g_btn_up.setEventCallback(on_button_event);
+    g_btn_down.setEventCallback(on_button_event);
+
     // Try to load car from SD card
-    // Default car path on SD card
     const char* car_dir = "1:/ExhaustNote/ferrari_458";
     bool car_ok = load_car_from_sd(car_dir);
 
@@ -282,33 +333,57 @@ int main(void)
         Serial.println("[ExhaustNote] No car loaded, sine wave fallback.");
     }
 
-    // Main loop: 1kHz tick for physics + input
-    uint32_t tick = 0;
-    const float dt = 0.001f; // 1ms
+    // Main loop — time-based scheduling via millis()
+    uint32_t last_physics_ms = millis();
+    uint32_t last_button_ms = millis();
+    uint32_t last_print_ms = millis();
 
     while (1) {
-        if (g_engine_running) {
-            // Read throttle from potentiometer (ADC, 0-4095 → 0.0-1.0)
-            uint16_t adc_raw = adc_ordinary_conversion_data_get(ADC1);
-            float throttle = static_cast<float>(adc_raw) / 4095.0f;
+        uint32_t now = millis();
 
-            // Update transmission physics
-            g_transmission.update(throttle, dt);
-
-            // Update audio params (read by ISR)
-            g_params.rpm = g_transmission.rpm();
-            g_params.throttle = throttle;
-            g_params.load = g_transmission.load();
+        // Button scan @ 100Hz (every 10ms)
+        if (now - last_button_ms >= 10) {
+            last_button_ms = now;
+            g_btn_up.monitor(digitalRead(PIN_KEY1) == HIGH);
+            g_btn_down.monitor(digitalRead(PIN_KEY2) == HIGH);
         }
 
-        delay_ms(1);
-        tick++;
+        // Physics update @ 1kHz (every 1ms)
+        if (now - last_physics_ms >= 1) {
+            float dt = (now - last_physics_ms) * 0.001f;
+            last_physics_ms = now;
 
-        if (tick % 2000 == 0) {
+            if (g_engine_running) {
+                // Read throttle (12-bit ADC DMA -> 0.0~1.0)
+                uint16_t adc_raw = analogRead_DMA(PIN_THROTTLE);
+                float throttle = static_cast<float>(adc_raw) / 4095.0f;
+
+                // Update transmission physics
+                g_transmission.update(throttle, dt);
+
+                // Update audio params (read by ISR)
+                g_params.rpm = g_transmission.rpm();
+                g_params.throttle = throttle;
+                g_params.load = g_transmission.load();
+            }
+        }
+
+        // Status print @ 0.5Hz (every 2s)
+        if (now - last_print_ms >= 2000) {
+            last_print_ms = now;
+            // ISR CPU usage: cycles / budget (budget = 288MHz * 10.67ms = 3,072,000)
+            uint32_t pct = g_isr_cycles * 100 / 3072000;
             Serial.print("[ALIVE] rpm=");
             Serial.print((int)g_params.rpm);
             Serial.print(" thr=");
-            Serial.println((int)(g_params.throttle * 100));
+            Serial.print((int)(g_params.throttle * 100));
+            Serial.print(" gear=");
+            Serial.print(g_transmission.gear());
+            Serial.print(" isr=");
+            Serial.print(g_isr_cycles);
+            Serial.print("cy(");
+            Serial.print(pct);
+            Serial.println("%)");
         }
     }
 }

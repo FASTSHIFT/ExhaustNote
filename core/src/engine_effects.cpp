@@ -30,8 +30,8 @@ void CombustionPulse::process(float* output, size_t frames, float rpm, uint32_t 
     // = (120 * sample_rate) / (RPM * cylinders) samples between firings
     // But for a 4-stroke engine, each cylinder fires once per 2 revolutions,
     // so total firings per second = RPM * cylinders / 120
-    double firings_per_second = static_cast<double>(rpm) * config_.cylinders / 120.0;
-    double interval_samples = static_cast<double>(sample_rate) / firings_per_second;
+    float firings_per_second = rpm * config_.cylinders / 120.0f;
+    float interval_samples = static_cast<float>(sample_rate) / firings_per_second;
 
     // Volume fade based on RPM (pulses less audible at high RPM)
     float rpm_fade = 1.0f;
@@ -69,7 +69,7 @@ void CombustionPulse::process(float* output, size_t frames, float rpm, uint32_t 
 
 void CombustionPulse::reset()
 {
-    phase_acc_ = 0.0;
+    phase_acc_ = 0.0f;
     current_cyl_ = 0;
     pulse_pos_ = 0;
     pulse_active_ = false;

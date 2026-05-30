@@ -20,7 +20,7 @@ static char g_json_buf[4096];
 /// Parse layer entries from a JSON array.
 /// Returns number of layers parsed.
 static uint8_t parse_layers(cJSON* arr, const char* car_dir, SdramPool& pool,
-                            EngineVoice::LayerConfig* layers, uint8_t max_layers)
+    EngineVoice::LayerConfig* layers, uint8_t max_layers)
 {
     if (!arr || !cJSON_IsArray(arr))
         return 0;
@@ -120,8 +120,9 @@ bool car_load(const char* car_dir, SdramPool& pool, LoadedCar& car)
     if (j_torque_rpm)
         car.peak_torque_rpm = (float)j_torque_rpm->valuedouble;
 
-    // Transmission
-    cJSON* j_gears = cJSON_GetObjectItem(root, "gear_ratios");
+    // Transmission (may be nested under "transmission" object or flat)
+    cJSON* j_trans = cJSON_GetObjectItem(root, "transmission");
+    cJSON* j_gears = j_trans ? cJSON_GetObjectItem(j_trans, "gears") : cJSON_GetObjectItem(root, "gear_ratios");
     if (j_gears && cJSON_IsArray(j_gears)) {
         car.num_gears = 0;
         cJSON* g = NULL;
@@ -132,7 +133,7 @@ bool car_load(const char* car_dir, SdramPool& pool, LoadedCar& car)
         }
     }
 
-    cJSON* j_final = cJSON_GetObjectItem(root, "final_drive");
+    cJSON* j_final = j_trans ? cJSON_GetObjectItem(j_trans, "final_drive") : cJSON_GetObjectItem(root, "final_drive");
     if (j_final)
         car.final_drive = (float)j_final->valuedouble;
 
@@ -148,7 +149,7 @@ bool car_load(const char* car_dir, SdramPool& pool, LoadedCar& car)
 }
 
 void car_apply(const LoadedCar& car, EngineVoice& engine, Transmission& trans,
-               CombustionPulse& combustion, IdleFluctuation& idle)
+    CombustionPulse& combustion, IdleFluctuation& idle)
 {
     // Configure engine voice
     engine.set_engine_config(car.cylinders, 48000);
@@ -169,6 +170,7 @@ void car_apply(const LoadedCar& car, EngineVoice& engine, Transmission& trans,
     for (int i = 0; i < car.num_gears; i++)
         tc.gear_ratios[i] = car.gear_ratios[i];
     trans = Transmission(tc);
+    trans.set_external_load(200.0f); // Default drivetrain resistance (Nm)
 
     // Configure combustion pulse
     CombustionPulse::Config pc;

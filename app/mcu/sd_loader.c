@@ -125,7 +125,8 @@ uint32_t sd_wav_load(const char* path, int16_t* buf, uint32_t buf_max, sd_wav_in
 
         while (frames_loaded < num_frames) {
             uint32_t chunk_frames = num_frames - frames_loaded;
-            if (chunk_frames > 128) chunk_frames = 128;
+            if (chunk_frames > 128)
+                chunk_frames = 128;
 
             uint32_t bytes_to_read = chunk_frames * channels * 2;
             if (f_read(&file, stereo_buf, bytes_to_read, &bytes_read) != FR_OK

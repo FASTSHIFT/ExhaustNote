@@ -10,7 +10,7 @@ void SamplePlayer::load(const sample_t* data, size_t length, size_t loop_start, 
     length_ = length;
     loop_start_ = loop_start;
     loop_end_ = (loop_end > 0) ? loop_end : length;
-    phase_ = 0.0;
+    phase_ = 0.0f;
 }
 
 void SamplePlayer::load(const sample_t* data, size_t length)
@@ -20,7 +20,7 @@ void SamplePlayer::load(const sample_t* data, size_t length)
 
 void SamplePlayer::reset()
 {
-    phase_ = 0.0;
+    phase_ = 0.0f;
 }
 
 void SamplePlayer::process(sample_t* output, size_t frames)
@@ -41,12 +41,10 @@ void SamplePlayer::process(sample_t* output, size_t frames, float rate)
         return;
     }
 
-    double rate_d = static_cast<double>(rate);
-
     for (size_t i = 0; i < frames; ++i) {
         // Integer index with linear interpolation
         size_t idx = static_cast<size_t>(phase_);
-        double frac = phase_ - static_cast<double>(idx);
+        float frac = phase_ - static_cast<float>(idx);
 
         size_t idx_next = idx + 1;
         if (idx_next >= loop_end_) {
@@ -56,16 +54,16 @@ void SamplePlayer::process(sample_t* output, size_t frames, float rate)
         // Linear interpolation between adjacent samples
         float s0 = static_cast<float>(data_[idx]);
         float s1 = static_cast<float>(data_[idx_next]);
-        float sample = s0 + static_cast<float>(frac) * (s1 - s0);
+        float sample = s0 + frac * (s1 - s0);
 
         output[i] = static_cast<sample_t>(sample);
 
         // Advance phase at variable rate
-        phase_ += rate_d;
-        if (phase_ >= static_cast<double>(loop_end_)) {
-            phase_ = static_cast<double>(loop_start_) + (phase_ - static_cast<double>(loop_end_));
-        } else if (phase_ < 0.0) {
-            phase_ = 0.0;
+        phase_ += rate;
+        if (phase_ >= static_cast<float>(loop_end_)) {
+            phase_ = static_cast<float>(loop_start_) + (phase_ - static_cast<float>(loop_end_));
+        } else if (phase_ < 0.0f) {
+            phase_ = 0.0f;
         }
     }
 }
@@ -83,11 +81,9 @@ void SamplePlayer::process_float(float* output, size_t frames, float rate)
         return;
     }
 
-    double rate_d = static_cast<double>(rate);
-
     for (size_t i = 0; i < frames; ++i) {
         size_t idx = static_cast<size_t>(phase_);
-        double frac = phase_ - static_cast<double>(idx);
+        float frac = phase_ - static_cast<float>(idx);
 
         size_t idx_next = idx + 1;
         if (idx_next >= loop_end_) {
@@ -96,13 +92,13 @@ void SamplePlayer::process_float(float* output, size_t frames, float rate)
 
         float s0 = static_cast<float>(data_[idx]);
         float s1 = static_cast<float>(data_[idx_next]);
-        output[i] = s0 + static_cast<float>(frac) * (s1 - s0);
+        output[i] = s0 + frac * (s1 - s0);
 
-        phase_ += rate_d;
-        if (phase_ >= static_cast<double>(loop_end_)) {
-            phase_ = static_cast<double>(loop_start_) + (phase_ - static_cast<double>(loop_end_));
-        } else if (phase_ < 0.0) {
-            phase_ = 0.0;
+        phase_ += rate;
+        if (phase_ >= static_cast<float>(loop_end_)) {
+            phase_ = static_cast<float>(loop_start_) + (phase_ - static_cast<float>(loop_end_));
+        } else if (phase_ < 0.0f) {
+            phase_ = 0.0f;
         }
     }
 }

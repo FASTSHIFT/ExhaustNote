@@ -19,9 +19,9 @@ namespace exhaust {
 
 /// SDRAM memory pool for WAV samples
 struct SdramPool {
-    int16_t* base;     ///< SDRAM base address
+    int16_t* base; ///< SDRAM base address
     uint32_t capacity; ///< Total capacity in samples (int16)
-    uint32_t used;     ///< Samples allocated so far
+    uint32_t used; ///< Samples allocated so far
 
     /// Allocate n samples from pool. Returns nullptr if full.
     int16_t* alloc(uint32_t n)
@@ -69,6 +69,6 @@ bool car_load(const char* car_dir, SdramPool& pool, LoadedCar& car);
 
 /// Apply loaded car config to engine voice and transmission.
 void car_apply(const LoadedCar& car, EngineVoice& engine, Transmission& trans,
-               CombustionPulse& combustion, IdleFluctuation& idle);
+    CombustionPulse& combustion, IdleFluctuation& idle);
 
 } // namespace exhaust

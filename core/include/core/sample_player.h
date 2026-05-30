@@ -44,14 +44,14 @@ public:
     bool is_loaded() const { return data_ != nullptr; }
 
     /// Get current playback phase position.
-    double phase() const { return phase_; }
+    float phase() const { return phase_; }
 
 private:
     const sample_t* data_ = nullptr;
     size_t length_ = 0;
     size_t loop_start_ = 0;
     size_t loop_end_ = 0;
-    double phase_ = 0.0;
+    float phase_ = 0.0f;
 };
 
 } // namespace exhaust

@@ -49,7 +49,7 @@ private:
     size_t pulse_length_ = 0;
 
     // State
-    double phase_acc_ = 0.0; ///< Accumulator for firing interval
+    float phase_acc_ = 0.0f; ///< Accumulator for firing interval
     uint8_t current_cyl_ = 0; ///< Current cylinder index
     size_t pulse_pos_ = 0; ///< Current position in pulse playback
     bool pulse_active_ = false; ///< Is a pulse currently playing?

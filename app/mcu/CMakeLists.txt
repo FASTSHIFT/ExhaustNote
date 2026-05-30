@@ -31,8 +31,8 @@ set(LINKER_SCRIPT ${FWLIBS}/cmsis/cm4/device_support/startup/gcc/linker/AT32F437
 
 # Compiler flags
 set(MCU_FLAGS "-mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16")
-set(CMAKE_C_FLAGS "${MCU_FLAGS} -ffunction-sections -fdata-sections -O2 -ffast-math")
-set(CMAKE_CXX_FLAGS "${MCU_FLAGS} -ffunction-sections -fdata-sections -fno-exceptions -fno-rtti -O2 -ffast-math")
+set(CMAKE_C_FLAGS "${MCU_FLAGS} -ffunction-sections -fdata-sections -O3 -ffast-math -fsingle-precision-constant")
+set(CMAKE_CXX_FLAGS "${MCU_FLAGS} -ffunction-sections -fdata-sections -fno-exceptions -fno-rtti -O3 -ffast-math -fsingle-precision-constant")
 set(CMAKE_ASM_FLAGS "${MCU_FLAGS}")
 set(CMAKE_EXE_LINKER_FLAGS "${MCU_FLAGS} -T${LINKER_SCRIPT} -Wl,--gc-sections -specs=nosys.specs -specs=nano.specs -lm")
 
@@ -129,17 +129,21 @@ target_link_libraries(arduino_core PUBLIC at32_hal)
 # ============================================================
 # MCU Application
 # ============================================================
+set(BUTTON_EVENT_DIR ${ARTERY_DIR}/Libraries/ButtonEvent)
+
 add_executable(exhaust_mcu
     main.cpp
     audio_i2s.c
     sd_loader.c
     car_loader.cpp
     system_call.c
+    ${BUTTON_EVENT_DIR}/ButtonEvent.cpp
     ${ARTERY_DIR}/Platform/AT32F43x/Core/cxx_stubs.cpp
     ${STARTUP_FILE}
 )
 target_include_directories(exhaust_mcu PRIVATE
     ${PLATFORM_DIR}
+    ${BUTTON_EVENT_DIR}
 )
 target_link_libraries(exhaust_mcu PRIVATE
     exhaust_core_mcu
