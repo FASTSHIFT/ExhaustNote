@@ -57,6 +57,29 @@ compile_commands.json
 *.log
 *.bak
 *.swp
+*~
+
+# IDE
+.vscode/
+.idea/
+
+# Coverage
+*.gcno
+*.gcda
+*.gcov
+coverage/
+coverage.info
+
+# Audio assets (user-provided, not committed)
+assets/**/*.wav
+assets/**/*.bank
+assets/**/*.fsb
+assets/**/*.ogg
+assets/**/*.mp3
+
+# OS
+.DS_Store
+Thumbs.db
 
 # vcpkg
 vcpkg_installed/
