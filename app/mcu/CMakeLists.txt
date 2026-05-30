@@ -62,7 +62,6 @@ add_library(at32_bsp STATIC
     ${BSP_DIR}/at_surf_f437_board_key.c
     ${BSP_DIR}/at_surf_f437_board_joystick.c
     ${BSP_DIR}/at_surf_f437_board_variable_resistor.c
-    ${BSP_DIR}/at_surf_f437_board_delay.c
     ${BSP_DIR}/i2c_application.c
 )
 target_include_directories(at32_bsp PUBLIC
@@ -110,10 +109,27 @@ target_include_directories(exhaust_core_mcu PUBLIC
 target_compile_definitions(exhaust_core_mcu PRIVATE EXHAUST_MCU=1)
 
 # ============================================================
+# Arduino Core (Serial, Print, Stream, GPIO, etc.)
+# ============================================================
+file(GLOB ARDUINO_CORE_SRCS ${AT32_CORE}/*.c ${AT32_CORE}/*.cpp)
+file(GLOB ARDUINO_API_SRCS ${ARDUINO_API}/*.c ${ARDUINO_API}/*.cpp)
+add_library(arduino_core STATIC
+    ${ARDUINO_CORE_SRCS}
+    ${ARDUINO_API_SRCS}
+)
+target_include_directories(arduino_core PUBLIC
+    ${AT32_CORE}
+    ${ARDUINO_API}
+    ${ARTERY_DIR}/Platform/AT32F43x/Config
+)
+target_link_libraries(arduino_core PUBLIC at32_hal)
+
+# ============================================================
 # MCU Application
 # ============================================================
 add_executable(exhaust_mcu
     main.cpp
+    audio_i2s.c
     system_call.c
     ${ARTERY_DIR}/Platform/AT32F43x/Core/cxx_stubs.cpp
     ${STARTUP_FILE}
@@ -125,6 +141,7 @@ target_link_libraries(exhaust_mcu PRIVATE
     exhaust_core_mcu
     at32_bsp
     fatfs
+    arduino_core
     at32_hal
 )
 

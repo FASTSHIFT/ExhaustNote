@@ -93,4 +93,8 @@ Testing/
 imgui.ini
 # AT32 SDK (large, user downloads separately)
 platform/at32/AT32F435_437_Firmware_Library_V2.1.1/
+platform/at32/AT_SURF_F437_V1.1/
 *.zip
+
+# SD card audio resources (WAV files too large for git)
+sdcard/

@@ -10,14 +10,13 @@
 
 #include "at32f435_437.h"
 
-// BSP includes
+// BSP and driver includes
 extern "C" {
-#include "at_surf_f437_board_audio.h"
-#include "at_surf_f437_board_delay.h"
 #include "at_surf_f437_board_key.h"
 #include "at_surf_f437_board_pca9555.h"
 #include "at_surf_f437_board_sdram.h"
 #include "at_surf_f437_board_variable_resistor.h"
+#include "audio_i2s.h"
 }
 
 // Core engine includes
@@ -29,6 +28,8 @@ extern "C" {
 
 #include <cmath>
 #include <cstring>
+
+#include "Arduino.h"
 
 using namespace exhaust;
 
@@ -75,9 +76,9 @@ static void generate_sine(int16_t* buffer, size_t frames)
 }
 
 // ============================================================
-// Audio processing (called from DMA ISR)
+// Audio processing (called from DMA ISR via audio_i2s callback)
 // ============================================================
-static void process_audio(int16_t* buffer, size_t frames)
+static void process_audio(int16_t* buffer, uint32_t frames)
 {
     if (!g_engine_running) {
         // Phase 1: output sine wave for testing
@@ -117,37 +118,65 @@ static void process_audio(int16_t* buffer, size_t frames)
     g_mixer.finalize(buffer, frames);
 }
 
+// DMA IRQ handler is in audio_i2s.c — it calls process_audio() via callback
+
 // ============================================================
-// DMA Interrupt Handler (I2S TX) - our own implementation
-// BSP's audio.c is NOT compiled (it has player-specific logic)
+// I2C2 (PCA9555) IRQ Handlers — required for DMA-based I2C
 // ============================================================
-extern "C" void DMA1_Channel3_IRQHandler(void)
+extern "C" {
+void DMA1_Channel1_IRQHandler(void)
 {
-    if (dma_flag_get(DMA1_HDT3_FLAG)) {
-        dma_flag_clear(DMA1_HDT3_FLAG);
-        process_audio(&dma_buffer[0], AUDIO_BUFFER_SIZE);
-    }
-    if (dma_flag_get(DMA1_FDT3_FLAG)) {
-        dma_flag_clear(DMA1_FDT3_FLAG);
-        process_audio(&dma_buffer[AUDIO_BUFFER_SIZE], AUDIO_BUFFER_SIZE);
-    }
+    i2c_dma_tx_irq_handler(&hi2c_pca);
 }
+
+void DMA1_Channel2_IRQHandler(void)
+{
+    i2c_dma_rx_irq_handler(&hi2c_pca);
+}
+
+void I2C2_EVT_IRQHandler(void)
+{
+    i2c_evt_irq_handler(&hi2c_pca);
+}
+
+void I2C2_ERR_IRQHandler(void)
+{
+    i2c_err_irq_handler(&hi2c_pca);
+}
+} // extern "C"
 
 // ============================================================
 // System initialization
 // ============================================================
+extern "C" void system_clock_config(void);
+
 static void system_init(void)
 {
-    // Clock is configured by system_clock_config() in startup
-
-    // NVIC priority group
+    // NVIC priority group (before anything else)
     nvic_priority_group_config(NVIC_PRIORITY_GROUP_4);
 
-    // Delay init (SysTick)
-    delay_init();
+    // Early serial at 8MHz HSI (for pre-clock-config debug)
+    Serial.begin(115200);
+    Serial.println("\n[ExhaustNote] Pre-clock...");
+
+    // Configure system clock: HICK → PLL → 288MHz
+    system_clock_config();
+
+    // Re-init serial with correct baud after clock change
+    Serial.end();
+    Serial.begin(115200);
+
+    // Delay init (SysTick) - must be after clock config
+    Delay_Init();
+
+    Serial.println("[ExhaustNote] Boot OK");
+    Serial.print("  SystemCoreClock = ");
+    Serial.println(system_core_clock);
 
     // PCA9555 (needed for audio enable + joystick)
+    Serial.print("[INIT] PCA9555...");
     pca9555_init(PCA_I2C_CLKCTRL_100K);
+    Serial.println(" OK");
 
     // Keys
     key_init();
@@ -156,12 +185,14 @@ static void system_init(void)
     variable_resistor_init();
 
     // SDRAM
+    Serial.print("[INIT] SDRAM...");
     sdram_init();
+    Serial.println(" OK");
 
-    // Audio: WM8988 + I2S + DMA
-    // TODO: Implement I2S init based on at_surf_f437_board_audio.c
-    // audio_init() is in BSP but has player dependencies
-    // Phase 1: will add minimal I2S init here
+    // Audio: WM8988 + I2S + DMA (our own driver)
+    Serial.print("[INIT] Audio (WM8988 + I2S + DMA)...");
+    audio_i2s_init(process_audio);
+    Serial.println(" OK");
 }
 
 // ============================================================
@@ -197,10 +228,13 @@ int main(void)
 
     g_mixer.set_master_volume(0.8f);
 
-    // Start I2S DMA output (sine wave test in Phase 1)
-    // The DMA interrupt will call process_audio() to fill buffers
-    // TODO: Start DMA with dma_buffer, size = AUDIO_BUFFER_SIZE * 2
+    // Start audio output (sine wave test in Phase 1, engine in Phase 2+)
+    Serial.print("[INIT] Starting I2S DMA...");
+    audio_i2s_start();
+    Serial.println(" OK");
+    Serial.println("[ExhaustNote] Running! 1kHz sine wave output.");
 
+    uint32_t tick = 0;
     // Main loop
     while (1) {
         // Read throttle from potentiometer
@@ -217,5 +251,10 @@ int main(void)
         // g_params.load = g_transmission.load();
 
         delay_ms(1); // 1kHz main loop
+        tick++;
+        if (tick % 2000 == 0) {
+            Serial.print("[ALIVE] tick=");
+            Serial.println(tick);
+        }
     }
 }
