@@ -1,11 +1,15 @@
 /**
  * ExhaustNote MCU Firmware - AT32F437 Entry Point
  *
- * Phase 1: Sine wave test through WM8988 CODEC
- * - Initializes system clock (288MHz)
- * - Configures WM8988 via I2C (through PCA9555)
- * - Sets up I2S DMA double-buffering
- * - Outputs 1kHz sine wave to verify audio path
+ * Architecture:
+ *   system_init() → sd_mount() → car_load() → car_apply() → audio_i2s_start()
+ *   Main loop: read throttle ADC → update transmission physics → update params
+ *   ISR (DMA): process_audio() callback fills I2S buffer in real-time
+ *
+ * Modules:
+ *   audio_i2s.c/h  — I2S DMA driver (WM8988 codec)
+ *   sd_loader.c/h  — SD card + FatFS + WAV file reader
+ *   car_loader.h/cpp — JSON config parser + EngineVoice setup
  */
 
 #include "at32f435_437.h"
@@ -17,7 +21,11 @@ extern "C" {
 #include "at_surf_f437_board_sdram.h"
 #include "at_surf_f437_board_variable_resistor.h"
 #include "audio_i2s.h"
+#include "sd_loader.h"
 }
+
+// App modules
+#include "car_loader.h"
 
 // Core engine includes
 #include "core/engine_effects.h"
@@ -34,17 +42,17 @@ extern "C" {
 using namespace exhaust;
 
 // ============================================================
-// Audio DMA double buffer
+// Constants
 // ============================================================
-#define AUDIO_BUFFER_SIZE 512 // samples per half-buffer
-#define AUDIO_SAMPLE_RATE 44100
+#define AUDIO_BUFFER_SIZE 512 // samples per half-buffer (DMA callback)
+#define AUDIO_SAMPLE_RATE 48000 // Matches WM8988 config
 
-static int16_t dma_buffer[AUDIO_BUFFER_SIZE * 2]; // Double buffer (L+R interleaved would be *4, but mono for now)
-static volatile bool buffer_half_ready = false;
-static volatile bool buffer_full_ready = false;
+// SDRAM: 8MB at 0xC0000000 for WAV sample storage
+#define SDRAM_BASE ((int16_t*)0xC0000000)
+#define SDRAM_SIZE_SAMPLES (8 * 1024 * 1024 / 2) // 4M samples (8MB / 2 bytes)
 
 // ============================================================
-// Engine state (global for ISR access)
+// Engine state (global — accessed from ISR)
 // ============================================================
 static EngineVoice g_engine;
 static Mixer g_mixer;
@@ -54,24 +62,34 @@ static Transmission g_transmission;
 static EngineVoice::Params g_params;
 static bool g_engine_running = false;
 
-// Combustion pulse sample (generated at startup)
+// Combustion pulse sample (synthesized at startup)
 static sample_t g_pulse_sample[512];
 
+// SDRAM memory pool for WAV samples
+static SdramPool g_sdram_pool;
+static LoadedCar g_car;
+
 // ============================================================
-// Phase 1: Simple sine wave generator (for testing)
+// Sine wave fallback (500ms beep then silence)
 // ============================================================
 static float sine_phase = 0.0f;
-static const float SINE_FREQ = 1000.0f; // 1kHz test tone
+static uint32_t sine_samples_played = 0;
+static const uint32_t SINE_DURATION_SAMPLES = AUDIO_SAMPLE_RATE / 2; // 500ms
 
 static void generate_sine(int16_t* buffer, size_t frames)
 {
-    float phase_inc = SINE_FREQ / static_cast<float>(AUDIO_SAMPLE_RATE);
+    const float phase_inc = 1000.0f / static_cast<float>(AUDIO_SAMPLE_RATE);
     for (size_t i = 0; i < frames; ++i) {
-        float sample = std::sin(sine_phase * 6.2831853f) * 16000.0f;
-        buffer[i] = static_cast<int16_t>(sample);
-        sine_phase += phase_inc;
-        if (sine_phase >= 1.0f)
-            sine_phase -= 1.0f;
+        if (sine_samples_played < SINE_DURATION_SAMPLES) {
+            float sample = std::sin(sine_phase * 6.2831853f) * 16000.0f;
+            buffer[i] = static_cast<int16_t>(sample);
+            sine_phase += phase_inc;
+            if (sine_phase >= 1.0f)
+                sine_phase -= 1.0f;
+            sine_samples_played++;
+        } else {
+            buffer[i] = 0;
+        }
     }
 }
 
@@ -148,30 +166,29 @@ void I2C2_ERR_IRQHandler(void)
 // ============================================================
 // System initialization
 // ============================================================
-extern "C" void system_clock_config(void);
+extern "C" void Core_Init(void);
 
 static void system_init(void)
 {
-    // NVIC priority group (before anything else)
-    nvic_priority_group_config(NVIC_PRIORITY_GROUP_4);
+    // Core_Init: system_clock_config() + NVIC + DWT + Delay + ADC
+    Core_Init();
 
-    // Early serial at 8MHz HSI (for pre-clock-config debug)
+    // Serial (after clock is 288MHz)
     Serial.begin(115200);
-    Serial.println("\n[ExhaustNote] Pre-clock...");
-
-    // Configure system clock: HICK → PLL → 288MHz
-    system_clock_config();
-
-    // Re-init serial with correct baud after clock change
-    Serial.end();
-    Serial.begin(115200);
-
-    // Delay init (SysTick) - must be after clock config
-    Delay_Init();
-
-    Serial.println("[ExhaustNote] Boot OK");
+    Serial.println("\n[ExhaustNote] Boot OK");
     Serial.print("  SystemCoreClock = ");
     Serial.println(system_core_clock);
+
+    // SD card (before PCA9555, matching audio demo order)
+    Serial.print("[INIT] SD card...");
+    int sd_ret = sd_mount();
+    if (sd_ret == 0) {
+        Serial.println(" OK");
+    } else {
+        Serial.print(" FAIL (");
+        Serial.print(-sd_ret);
+        Serial.println(")");
+    }
 
     // PCA9555 (needed for audio enable + joystick)
     Serial.print("[INIT] PCA9555...");
@@ -196,65 +213,102 @@ static void system_init(void)
 }
 
 // ============================================================
+// Load car from SD card
+// ============================================================
+static bool load_car_from_sd(const char* car_dir)
+{
+    // Initialize SDRAM pool
+    g_sdram_pool.base = SDRAM_BASE;
+    g_sdram_pool.capacity = SDRAM_SIZE_SAMPLES;
+    g_sdram_pool.reset();
+
+    Serial.print("[LOAD] Loading car: ");
+    Serial.println(car_dir);
+
+    if (!car_load(car_dir, g_sdram_pool, g_car)) {
+        Serial.println("[LOAD] FAILED to load car!");
+        return false;
+    }
+
+    Serial.print("  Onload layers: ");
+    Serial.println(g_car.num_onload);
+    Serial.print("  Offload layers: ");
+    Serial.println(g_car.num_offload);
+    Serial.print("  SDRAM used: ");
+    Serial.print(g_sdram_pool.used * 2 / 1024);
+    Serial.println(" KB");
+
+    // Generate combustion pulse
+    for (int i = 0; i < 512; ++i) {
+        float t = static_cast<float>(i) / 48000.0f;
+        float env = std::exp(-t * 150.0f);
+        float wave = std::sin(t * 120.0f * 6.28f) * 0.6f + std::sin(t * 60.0f * 6.28f) * 0.4f;
+        g_pulse_sample[i] = static_cast<sample_t>(wave * env * 12000.0f);
+    }
+    g_combustion.load_pulse(g_pulse_sample, 512);
+
+    // Apply car config to engine
+    car_apply(g_car, g_engine, g_transmission, g_combustion, g_idle_fluct);
+    g_mixer.set_master_volume(0.8f);
+
+    Serial.println("[LOAD] Car loaded OK!");
+    return true;
+}
+
+// ============================================================
 // Main
 // ============================================================
 int main(void)
 {
     system_init();
 
-    // Generate combustion pulse
-    for (int i = 0; i < 512; ++i) {
-        float t = static_cast<float>(i) / 44100.0f;
-        float env = std::exp(-t * 150.0f);
-        float wave = std::sin(t * 120.0f * 6.28f) * 0.6f
-            + std::sin(t * 60.0f * 6.28f) * 0.4f;
-        g_pulse_sample[i] = static_cast<sample_t>(wave * env * 12000.0f);
-    }
+    // Try to load car from SD card
+    // Default car path on SD card
+    const char* car_dir = "1:/ExhaustNote/ferrari_458";
+    bool car_ok = load_car_from_sd(car_dir);
 
-    // Configure effects
-    CombustionPulse::Config pc;
-    pc.cylinders = 8;
-    pc.volume = 0.2f;
-    pc.rpm_fade_start = 3000.0f;
-    pc.rpm_fade_end = 5000.0f;
-    g_combustion.load_pulse(g_pulse_sample, 512);
-    g_combustion.set_config(pc);
-
-    IdleFluctuation::Config ic;
-    ic.amplitude = 25.0f;
-    ic.rate = 1.0f;
-    ic.rpm_threshold = 1500.0f;
-    g_idle_fluct.set_config(ic);
-
-    g_mixer.set_master_volume(0.8f);
-
-    // Start audio output (sine wave test in Phase 1, engine in Phase 2+)
+    // Start audio output
     Serial.print("[INIT] Starting I2S DMA...");
     audio_i2s_start();
     Serial.println(" OK");
-    Serial.println("[ExhaustNote] Running! 1kHz sine wave output.");
 
+    if (car_ok) {
+        g_engine_running = true;
+        g_params.rpm = g_car.rpm_idle;
+        g_params.throttle = 0.0f;
+        g_params.load = 0.0f;
+        Serial.println("[ExhaustNote] Engine running!");
+    } else {
+        Serial.println("[ExhaustNote] No car loaded, sine wave fallback.");
+    }
+
+    // Main loop: 1kHz tick for physics + input
     uint32_t tick = 0;
-    // Main loop
+    const float dt = 0.001f; // 1ms
+
     while (1) {
-        // Read throttle from potentiometer
-        // float throttle = analogRead(PA5) / 4095.0f;
-        // TODO: Implement with ADC read
+        if (g_engine_running) {
+            // Read throttle from potentiometer (ADC, 0-4095 → 0.0-1.0)
+            uint16_t adc_raw = adc_ordinary_conversion_data_get(ADC1);
+            float throttle = static_cast<float>(adc_raw) / 4095.0f;
 
-        // Read keys for shifting
-        // TODO: ButtonEvent integration
+            // Update transmission physics
+            g_transmission.update(throttle, dt);
 
-        // Update physics
-        // g_transmission.update(throttle, 0.001f); // 1ms tick
-        // g_params.rpm = g_transmission.rpm();
-        // g_params.throttle = throttle;
-        // g_params.load = g_transmission.load();
+            // Update audio params (read by ISR)
+            g_params.rpm = g_transmission.rpm();
+            g_params.throttle = throttle;
+            g_params.load = g_transmission.load();
+        }
 
-        delay_ms(1); // 1kHz main loop
+        delay_ms(1);
         tick++;
+
         if (tick % 2000 == 0) {
-            Serial.print("[ALIVE] tick=");
-            Serial.println(tick);
+            Serial.print("[ALIVE] rpm=");
+            Serial.print((int)g_params.rpm);
+            Serial.print(" thr=");
+            Serial.println((int)(g_params.throttle * 100));
         }
     }
 }

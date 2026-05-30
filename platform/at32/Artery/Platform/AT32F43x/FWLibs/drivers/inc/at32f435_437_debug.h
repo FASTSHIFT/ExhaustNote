@@ -1,9 +1,10 @@
 /**
   **************************************************************************
-  * @file     at32f435_437_mcudbg.h
-  * @brief    at32f435_437 mcudbg header file
+  * @file     at32f435_437_debug.h
+  * @brief    at32f435_437 debug header file
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -23,8 +24,8 @@
   */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __AT32F435_437_MCUDBG_H
-#define __AT32F435_437_MCUDBG_H
+#ifndef __AT32F435_437_DEBUG_H
+#define __AT32F435_437_DEBUG_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -118,6 +119,7 @@ typedef struct
       __IO uint32_t reserved1            : 29;/* [31:3] */
     } ctrl_bit;
   };
+
   /**
     * @brief debug apb1 frz register, offset:0x08
     */
@@ -150,8 +152,9 @@ typedef struct
       __IO uint32_t reserved4            : 3;/* [31:29] */
     } apb1_frz_bit;
   };
+
   /**
-    * @brief debug apb2 frz register, offset:0x0c
+    * @brief debug apb2 frz register, offset:0x0C
     */
   union
   {
@@ -168,6 +171,26 @@ typedef struct
       __IO uint32_t tmr11_pause          : 1;/* [18] */
       __IO uint32_t reserved3            : 13;/* [31:19] */
     } apb2_frz_bit;
+  };
+
+  /**
+    * @brief debug reserved1 register, offset:0x10~0x1C
+    */
+  __IO uint32_t reserved1[4];
+
+  /**
+    * @brief debug ser id register, offset:0x20
+    */
+  union
+  {
+    __IO uint32_t ser_id;
+    struct
+    {
+      __IO uint32_t rev_id               : 3;/* [2:0] */
+      __IO uint32_t reserved1            : 5;/* [7:3] */
+      __IO uint32_t ser_id               : 8;/* [15:8] */
+      __IO uint32_t reserved2            : 16;/* [31:16] */
+    } ser_id_bit;
   };
 
 } debug_type;

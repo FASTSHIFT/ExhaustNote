@@ -3,7 +3,8 @@
   * @file     at32f435_437_can.h
   * @brief    at32f435_437 can header file
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -980,7 +981,7 @@ typedef struct
   __IO uint32_t reserved6[8];
 
   /**
-    * @brief can ffb register, offset:0x240~0x2AC
+    * @brief can ffb register, offset:0x240~0x31C
     */
   can_filter_register_type ffb[28];
 } can_type;
@@ -1018,6 +1019,7 @@ can_error_record_type can_error_type_record_get(can_type* can_x);
 uint8_t can_receive_error_counter_get(can_type* can_x);
 uint8_t can_transmit_error_counter_get(can_type* can_x);
 void can_interrupt_enable(can_type* can_x, uint32_t can_int, confirm_state new_state);
+flag_status can_interrupt_flag_get(can_type* can_x, uint32_t can_flag);
 flag_status can_flag_get(can_type* can_x, uint32_t can_flag);
 void can_flag_clear(can_type* can_x, uint32_t can_flag);
 

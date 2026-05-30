@@ -3,7 +3,8 @@
   * @file     at32f435_437_crc.c
   * @brief    contains all the functions for the crc firmware library
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -145,6 +146,52 @@ void crc_reverse_input_data_set(crc_reverse_input_type value)
 void crc_reverse_output_data_set(crc_reverse_output_type value)
 {
   CRC->ctrl_bit.revod = value;
+}
+
+/**
+  * @brief  config crc polynomial value
+  * @param  value
+  *         32-bit new data of crc poly value
+  * @retval none.
+  */
+void crc_poly_value_set(uint32_t value)
+{
+  CRC->poly = value;
+}
+
+/**
+  * @brief  return crc polynomial value
+  * @param  none
+  * @retval 32-bit value of the polynomial value.
+  */
+uint32_t crc_poly_value_get(void)
+{
+  return (CRC->poly);
+}
+
+/**
+  * @brief  config crc polynomial data size
+  * @param  size
+  *         this parameter can be one of the following values:
+  *         - CRC_POLY_SIZE_32B
+  *         - CRC_POLY_SIZE_16B
+  *         - CRC_POLY_SIZE_8B
+  *         - CRC_POLY_SIZE_7B
+  * @retval none.
+  */
+void crc_poly_size_set(crc_poly_size_type size)
+{
+  CRC->ctrl_bit.poly_size = size;
+}
+
+/**
+  * @brief  return crc polynomial data size
+  * @param  none
+  * @retval polynomial data size.
+  */
+crc_poly_size_type crc_poly_size_get(void)
+{
+  return (crc_poly_size_type)(CRC->ctrl_bit.poly_size);
 }
 
 /**

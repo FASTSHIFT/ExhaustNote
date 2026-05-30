@@ -4,7 +4,8 @@
   * @brief    this file provides a set of functions needed to manage the
   *           sdio/mmc card memory.
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -125,11 +126,11 @@ sd_error_status_type sd_init(void)
     sdio_reset(SDIOx);
     /* power on */
     status = sd_power_on();
-    
+
     if(status == SD_OK)
       break;
   }
-  
+
   if(status == SD_OK)
   {
     /* sdio card initialize */
@@ -179,8 +180,8 @@ sd_error_status_type sd_init(void)
     }
     else
     {
-      /* set sdio_ck to 48mhz */
-      clkdiv = system_core_clock / 48000000;
+      /* set sdio_ck to 25mhz */
+      clkdiv = system_core_clock / 25000000;
 
       if(clkdiv >= 2)
       {
@@ -313,7 +314,7 @@ sd_error_status_type sd_power_on(void)
     while((!valid_voltage) && (count < SD_MAX_VOLT_TRIAL))
     {
       delay_ms(10);
-      
+
       /* send cmd55 before acmd41 */
       sdio_command_init_struct.argument = 0x00;
       sdio_command_init_struct.cmd_index = SD_CMD_APP_CMD;
@@ -380,7 +381,7 @@ sd_error_status_type sd_power_on(void)
     while((!valid_voltage) && (count < SD_MAX_VOLT_TRIAL))
     {
       delay_ms(10);
-      
+
       sdio_command_init_struct.argument = SD_VOLTAGE_WINDOW_MMC;
       sdio_command_init_struct.cmd_index = SD_CMD_SEND_OP_COND;
       sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
@@ -833,7 +834,7 @@ sd_error_status_type sd_deselect_select(uint32_t addr)
   sdio_command_init_struct.argument =  addr;
   sdio_command_init_struct.cmd_index = SD_CMD_SEL_DESEL_CARD;
   sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
-  sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_INT;
+  sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
 
   /* sdio command config */
   sdio_command_config(SDIOx, &sdio_command_init_struct);
@@ -1811,7 +1812,7 @@ void SDIO2_IRQHandler(void)
   */
 sd_error_status_type sd_irq_service(void)
 {
-  if(sdio_flag_get(SDIOx, SDIO_DTCMPL_FLAG) != RESET)
+  if(sdio_interrupt_flag_get(SDIOx, SDIO_DTCMPL_FLAG) != RESET)
   {
     if(stop_flag == 1)
     {
@@ -1836,7 +1837,7 @@ sd_error_status_type sd_irq_service(void)
     return transfer_error;
   }
 
-  if(sdio_flag_get(SDIOx, SDIO_DTFAIL_FLAG) != RESET)
+  if(sdio_interrupt_flag_get(SDIOx, SDIO_DTFAIL_FLAG) != RESET)
   {
     /* clear flag */
     sdio_flag_clear(SDIOx, SDIO_DTFAIL_FLAG);
@@ -1845,7 +1846,7 @@ sd_error_status_type sd_irq_service(void)
     return transfer_error;
   }
 
-  if(sdio_flag_get(SDIOx, SDIO_DTTIMEOUT_FLAG) != RESET)
+  if(sdio_interrupt_flag_get(SDIOx, SDIO_DTTIMEOUT_FLAG) != RESET)
   {
     /* clear flag */
     sdio_flag_clear(SDIOx, SDIO_DTTIMEOUT_FLAG);
@@ -1854,7 +1855,7 @@ sd_error_status_type sd_irq_service(void)
     return transfer_error;
   }
 
-  if(sdio_flag_get(SDIOx, SDIO_RXERRO_FLAG) != RESET)
+  if(sdio_interrupt_flag_get(SDIOx, SDIO_RXERRO_FLAG) != RESET)
   {
     /* clear flag */
     sdio_flag_clear(SDIOx, SDIO_RXERRO_FLAG);
@@ -1863,7 +1864,7 @@ sd_error_status_type sd_irq_service(void)
     return(SD_RX_OVERRUN);
   }
 
-  if(sdio_flag_get(SDIOx, SDIO_TXERRU_FLAG) != RESET)
+  if(sdio_interrupt_flag_get(SDIOx, SDIO_TXERRU_FLAG) != RESET)
   {
     /* clear flag */
     sdio_flag_clear(SDIOx, SDIO_TXERRU_FLAG);
@@ -1872,7 +1873,7 @@ sd_error_status_type sd_irq_service(void)
     return(SD_TX_UNDERRUN);
   }
 
-  if(sdio_flag_get(SDIOx, SDIO_SBITERR_FLAG) != RESET)
+  if(sdio_interrupt_flag_get(SDIOx, SDIO_SBITERR_FLAG) != RESET)
   {
     /* clear flag */
     sdio_flag_clear(SDIOx, SDIO_SBITERR_FLAG);

@@ -57,17 +57,16 @@ void system_clock_config(void)
   /* reset crm */
   crm_reset();
 
-  /* enable hick */
-  crm_clock_source_enable(CRM_CLOCK_SOURCE_HICK, TRUE);
+  /* enable hext (8MHz external crystal on AT-SURF-F437) */
+  crm_clock_source_enable(CRM_CLOCK_SOURCE_HEXT, TRUE);
 
-   /* wait till hick is ready */
-  while(crm_flag_get(CRM_HICK_STABLE_FLAG) != SET)
+  /* wait till hext is ready */
+  while(crm_hext_stable_wait() == ERROR)
   {
   }
 
-
-  /* config pll clock resource */
-  crm_pll_config(CRM_PLL_SOURCE_HICK, 72, 1, CRM_PLL_FR_2);
+  /* config pll clock resource: HEXT 8MHz * 144 / 1 / 4 = 288MHz */
+  crm_pll_config(CRM_PLL_SOURCE_HEXT, 144, 1, CRM_PLL_FR_4);
 
   /* enable pll */
   crm_clock_source_enable(CRM_CLOCK_SOURCE_PLL, TRUE);

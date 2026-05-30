@@ -3,7 +3,8 @@
   * @file     at32f435_437_dac.h
   * @brief    at32f435_437 dac header file
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -371,6 +372,7 @@ void dac_2_data_set(dac2_aligned_data_type dac2_aligned, uint16_t dac2_data);
 void dac_dual_data_set(dac_dual_data_type dac_dual, uint16_t data1, uint16_t data2);
 void dac_udr_enable(dac_select_type dac_select, confirm_state new_state);
 flag_status dac_udr_flag_get(dac_select_type dac_select);
+flag_status dac_udr_interrupt_flag_get(dac_select_type dac_select);
 void dac_udr_flag_clear(dac_select_type dac_select);
 
 /**

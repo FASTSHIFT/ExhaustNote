@@ -3,7 +3,8 @@
   * @file     at32f435_437_dma.h
   * @brief    at32f435_437 dma header file
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -149,7 +150,8 @@ typedef enum
 {
   DMA_DIR_PERIPHERAL_TO_MEMORY           = 0x0000, /*!< dma data transfer direction: peripheral to memory */
   DMA_DIR_MEMORY_TO_PERIPHERAL           = 0x0010, /*!< dma data transfer direction: memory to peripheral */
-  DMA_DIR_MEMORY_TO_MEMORY               = 0x4000  /*!< dma data transfer direction: memory to memory */
+  DMA_DIR_MEMORY_TO_MEMORY               = 0x4000  /*!< dma data transfer direction: memory to memory
+                                                        note:if the direction is memory to memory,peripheral_base_addr as source and memory_base_addr as destnation */
 } dma_dir_type;
 
 /**
@@ -374,7 +376,7 @@ typedef struct
 {
   uint32_t                               peripheral_base_addr;    /*!< base addrress for peripheral */
   uint32_t                               memory_base_addr;        /*!< base addrress for memory */
-  dma_dir_type                           direction;               /*!< dma transmit direction, peripheral as source or as destnation  */
+  dma_dir_type                           direction;               /*!< dma transmit direction, peripheral as source or as destnation */
   uint16_t                               buffer_size;             /*!< counter to transfer (0~0xFFFF) */
   confirm_state                          peripheral_inc_enable;   /*!< periphera address increment after one transmit */
   confirm_state                          memory_inc_enable;       /*!< memory address increment after one transmit */
@@ -745,6 +747,7 @@ uint16_t dma_data_number_get(dma_channel_type *dmax_channely);
 void dma_interrupt_enable(dma_channel_type *dmax_channely, uint32_t dma_int, confirm_state new_state);
 void dma_channel_enable(dma_channel_type *dmax_channely, confirm_state new_state);
 flag_status dma_flag_get(uint32_t dmax_flag);
+flag_status dma_interrupt_flag_get(uint32_t dmax_flag);
 void dma_flag_clear(uint32_t dmax_flag);
 void dma_default_para_init(dma_init_type *dma_init_struct);
 void dma_init(dma_channel_type *dmax_channely, dma_init_type *dma_init_struct);
@@ -760,8 +763,10 @@ void dmamux_generator_config(dmamux_generator_type *dmamux_gen_x, dmamux_gen_ini
 void dmamux_sync_interrupt_enable(dmamux_channel_type *dmamux_channelx, confirm_state new_state);
 void dmamux_generator_interrupt_enable(dmamux_generator_type *dmamux_gen_x, confirm_state new_state);
 flag_status dmamux_sync_flag_get(dma_type *dma_x, uint32_t flag);
+flag_status dmamux_sync_interrupt_flag_get(dma_type *dma_x, uint32_t flag);
 void dmamux_sync_flag_clear(dma_type *dma_x, uint32_t flag);
 flag_status dmamux_generator_flag_get(dma_type *dma_x, uint32_t flag);
+flag_status dmamux_generator_interrupt_flag_get(dma_type *dma_x, uint32_t flag);
 void dmamux_generator_flag_clear(dma_type *dma_x, uint32_t flag);
 
 /**

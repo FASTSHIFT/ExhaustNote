@@ -3,7 +3,8 @@
   * @file     at32f435_437_dvp.h
   * @brief    at32f435_437 dvp header file
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -572,7 +573,6 @@ typedef struct
 
 void dvp_reset(void);
 void dvp_capture_enable(confirm_state new_state);
-void dvp_capture_enable(confirm_state new_state);
 void dvp_capture_mode_set(dvp_cfm_type cap_mode);
 void dvp_window_crop_enable(confirm_state new_state);
 void dvp_window_crop_set(uint16_t crop_x, uint16_t crop_y, uint16_t crop_w, uint16_t crop_h, uint8_t bytes);
@@ -590,6 +590,7 @@ void dvp_zoomout_select(dvp_pcdes_type dvp_pcdes);
 void dvp_zoomout_set(dvp_pcdc_type dvp_pcdc, dvp_pcds_type dvp_pcds, dvp_lcdc_type dvp_lcdc, dvp_lcds_type dvp_lcds);
 flag_status dvp_basic_status_get(dvp_status_basic_type dvp_status_basic);
 void dvp_interrupt_enable(uint32_t dvp_int, confirm_state new_state);
+flag_status dvp_interrupt_flag_get(uint32_t flag);
 flag_status dvp_flag_get(uint32_t flag);
 void dvp_flag_clear(uint32_t flag);
 void dvp_enhanced_scaling_resize_enable(confirm_state new_state);

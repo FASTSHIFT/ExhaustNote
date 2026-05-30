@@ -25,6 +25,8 @@
 #include <sys/times.h>
 #include <unistd.h>
 
+#include "at32f435_437.h"
+
 __attribute__((weak)) int _isatty(int fd)
 {
     if (fd >= STDIN_FILENO && fd <= STDERR_FILENO) {
@@ -69,7 +71,13 @@ __attribute__((weak)) int _read(int file, char* ptr, int len)
 
 __attribute__((weak)) int _write(int file, char* ptr, int len)
 {
-    return -1;
+    (void)file;
+    for (int i = 0; i < len; i++) {
+        while (!(USART1->sts & USART_TDBE_FLAG))
+            ;
+        USART1->dt = (uint8_t)ptr[i];
+    }
+    return len;
 }
 
 __attribute__((weak)) int _getpid(void)
@@ -85,4 +93,12 @@ __attribute__((weak)) int _kill(pid_t pid, int sig)
 __attribute__((weak)) clock_t _times(struct tms* buf)
 {
     return -1;
+}
+
+/* FatFS timestamp stub (no RTC) */
+#include "ff.h"
+DWORD get_fattime(void)
+{
+    /* Return a fixed timestamp: 2025-01-01 00:00:00 */
+    return ((DWORD)(2025 - 1980) << 25) | ((DWORD)1 << 21) | ((DWORD)1 << 16);
 }

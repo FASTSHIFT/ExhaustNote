@@ -6,12 +6,10 @@
 **  Abstract    : Linker script for AT32F437xM Device with
 **                4096KByte FLASH, 384KByte RAM
 **
-**                Set heap size, stack size and stack location according
-**                to application requirements.
+**                Stack is placed after BSS, growing upward in address.
+**                Stack overflow triggers hardware fault (no silent corruption).
 **
-**                Set memory bank area and size if external memory is used.
-**
-**  Target      : Artery Tek AT32
+**  Target      : Artery Tek AT32 (ExhaustNote)
 **
 **  Environment : Arm gcc toolchain
 **
@@ -21,12 +19,8 @@
 /* Entry Point */
 ENTRY(Reset_Handler)
 
-/* Highest address of the user mode stack */
-_estack = 0x20060000;    /* end of RAM */
-
-/* Generate a link error if heap and stack don't fit into RAM */
-_Min_Heap_Size = 0x2000;     /* 8KB heap  */
-_Min_Stack_Size = 0x4000;    /* 16KB stack */
+/* Stack size */
+_Min_Stack_Size = 0x6000;    /* 24KB stack */
 
 /* Specify the memory areas */
 MEMORY
@@ -131,16 +125,20 @@ SECTIONS
     __bss_end__ = _ebss;
   } >RAM
 
-  /* User_heap_stack section, used to check that there is enough RAM left */
-  ._user_heap_stack :
+  /* Stack section - placed after BSS, grows downward from _estack */
+  .stack :
   {
     . = ALIGN(8);
     PROVIDE ( end = . );
     PROVIDE ( _end = . );
-    . = . + _Min_Heap_Size;
+    _sstack = .;
     . = . + _Min_Stack_Size;
     . = ALIGN(8);
+    _estack = .;       /* stack top (initial SP) */
   } >RAM
+
+  /* Verify RAM usage */
+  ASSERT(_estack <= ORIGIN(RAM) + LENGTH(RAM), "RAM overflow")
 
   /* Remove information from the standard libraries */
   /DISCARD/ :

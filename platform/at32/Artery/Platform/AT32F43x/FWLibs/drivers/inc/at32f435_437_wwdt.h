@@ -3,7 +3,8 @@
   * @file     at32f435_437_wwdt.h
   * @brief    at32f435_437 wwdt header file
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -134,6 +135,7 @@ void wwdt_flag_clear(void);
 void wwdt_enable(uint8_t wwdt_cnt);
 void wwdt_interrupt_enable(void);
 flag_status wwdt_flag_get(void);
+flag_status wwdt_interrupt_flag_get(void);
 void wwdt_counter_set(uint8_t wwdt_cnt);
 void wwdt_window_counter_set(uint8_t window_cnt);
 

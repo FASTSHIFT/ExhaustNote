@@ -3,7 +3,8 @@
   * @file     at32f435_437_acc.h
   * @brief    at32f435_437 acc header file
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -182,6 +183,7 @@ uint16_t acc_read_c1(void);
 uint16_t acc_read_c2(void);
 uint16_t acc_read_c3(void);
 flag_status acc_flag_get(uint16_t acc_flag);
+flag_status acc_interrupt_flag_get(uint16_t acc_flag);
 void acc_flag_clear(uint16_t acc_flag);
 
 /**

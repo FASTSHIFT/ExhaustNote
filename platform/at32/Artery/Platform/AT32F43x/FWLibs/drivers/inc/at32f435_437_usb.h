@@ -3,7 +3,8 @@
   * @file     at32f435_437_usb.h
   * @brief    at32f435_437 usb header file
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -705,6 +706,7 @@ typedef struct
       __IO uint32_t nptxfspcavail            : 16; /* [15:0] */
       __IO uint32_t nptxqspcavail            : 8; /* [23:16] */
       __IO uint32_t nptxqtop                 : 7; /* [30:24] */
+      __IO uint32_t reserved1                : 1; /* [31]    */
     } gnptxsts_bit;
   };
 

@@ -3,7 +3,8 @@
   * @file     at32f435_437_crm.c
   * @brief    contains all the functions for the crm firmware library
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -104,7 +105,7 @@ void crm_hext_bypass(confirm_state new_state)
   *         - CRM_PLL_STABLE_FLAG
   *         - CRM_LEXT_STABLE_FLAG
   *         - CRM_LICK_STABLE_FLAG
-  *         - CRM_PIN_RESET_FLAG
+  *         - CRM_NRST_RESET_FLAG
   *         - CRM_POR_RESET_FLAG
   *         - CRM_SW_RESET_FLAG
   *         - CRM_WDT_RESET_FLAG
@@ -130,6 +131,64 @@ flag_status crm_flag_get(uint32_t flag)
   {
     status = SET;
   }
+  return status;
+}
+
+/**
+  * @brief  get crm interrupt flag status
+  * @param  flag
+  *         this parameter can be one of the following values:
+  *         - CRM_LICK_READY_INT_FLAG
+  *         - CRM_LEXT_READY_INT_FLAG
+  *         - CRM_HICK_READY_INT_FLAG
+  *         - CRM_HEXT_READY_INT_FLAG
+  *         - CRM_PLL_READY_INT_FLAG
+  *         - CRM_CLOCK_FAILURE_INT_FLAG
+  * @retval flag_status (SET or RESET)
+  */
+flag_status crm_interrupt_flag_get(uint32_t flag)
+{
+  flag_status status = RESET;
+  switch(flag)
+  {
+    case CRM_LICK_READY_INT_FLAG:
+      if(CRM->clkint_bit.lickstblf && CRM->clkint_bit.lickstblien)
+      {
+        status = SET;
+      }
+      break;
+    case CRM_LEXT_READY_INT_FLAG:
+      if(CRM->clkint_bit.lextstblf && CRM->clkint_bit.lextstblien)
+      {
+        status = SET;
+      }
+      break;
+    case CRM_HICK_READY_INT_FLAG:
+      if(CRM->clkint_bit.hickstblf && CRM->clkint_bit.hickstblien)
+      {
+        status = SET;
+      }
+      break;
+    case CRM_HEXT_READY_INT_FLAG:
+      if(CRM->clkint_bit.hextstblf && CRM->clkint_bit.hextstblien)
+      {
+        status = SET;
+      }
+      break;
+    case CRM_PLL_READY_INT_FLAG:
+      if(CRM->clkint_bit.pllstblf && CRM->clkint_bit.pllstblien)
+      {
+        status = SET;
+      }
+      break;
+    case CRM_CLOCK_FAILURE_INT_FLAG:
+      if(CRM->clkint_bit.cfdf && CRM->ctrl_bit.cfden)
+      {
+        status = SET;
+      }
+      break;
+  }
+
   return status;
 }
 
@@ -338,7 +397,7 @@ void crm_clock_source_enable(crm_clock_source_type source, confirm_state new_sta
   * @param  flag
   *         this parameter can be one of the following values:
   *         reset flag:
-  *         - CRM_PIN_RESET_FLAG
+  *         - CRM_NRST_RESET_FLAG
   *         - CRM_POR_RESET_FLAG
   *         - CRM_SW_RESET_FLAG
   *         - CRM_WDT_RESET_FLAG
@@ -671,6 +730,7 @@ void crm_pll_config(crm_pll_clock_source_type clock_source, uint16_t pll_ns, \
 void crm_sysclk_switch(crm_sclk_type value)
 {
   CRM->cfg_bit.sclksel = value;
+  DUMMY_NOP();
 }
 
 /**
@@ -727,7 +787,7 @@ void crm_clocks_freq_get(crm_clocks_freq_type *clocks_struct)
       pll_ms = CRM->pllcfg_bit.pllms;
       pll_fr = pll_fr_table[CRM->pllcfg_bit.pllfr];
 
-      if (pll_clock_source == CRM_PLL_SOURCE_HICK)
+      if(pll_clock_source == CRM_PLL_SOURCE_HICK)
       {
         /* hick selected as pll clock entry */
         pllrcsfreq = HICK_VALUE;
@@ -909,9 +969,10 @@ void crm_interrupt_enable(uint32_t crm_int, confirm_state new_state)
 error_status crm_pll_parameter_calculate(crm_pll_clock_source_type pll_rcs, uint32_t target_sclk_freq, \
                                          uint16_t *ret_ms, uint16_t *ret_ns, uint16_t *ret_fr)
 {
-  int32_t pll_rcs_freq = 0, ns = 0, ms = 0, fr = 0;
-  uint32_t ms_min = 0, ms_max = 0, error_min = 0xFFFFFFFF;
-  uint32_t result = 0, absolute_value = 0;
+  uint32_t error_min = 0xFFFFFFFF;
+  uint32_t pll_rcs_freq = 0, result = 0, absolute_value = 0;
+  uint16_t ns = 0, ms = 0, ms_min = 0, ms_max = 0;
+  int16_t fr = 0;
 
   /* reduce calculate accuracy, target_sclk_freq accuracy with khz */
   target_sclk_freq = target_sclk_freq / 1000;
@@ -955,7 +1016,7 @@ error_status crm_pll_parameter_calculate(crm_pll_clock_source_type pll_rcs, uint
         {
           *ret_ms = ms;
           *ret_ns = ns;
-          *ret_fr = fr;
+          *ret_fr = (uint16_t)fr;
           /* the pll parameters that is equal to target_sclk_freq */
           return SUCCESS;
         }
@@ -966,7 +1027,7 @@ error_status crm_pll_parameter_calculate(crm_pll_clock_source_type pll_rcs, uint
           error_min = absolute_value;
           *ret_ms = ms;
           *ret_ns = ns;
-          *ret_fr = fr;
+          *ret_fr = (uint16_t)fr;
         }
       }
     }

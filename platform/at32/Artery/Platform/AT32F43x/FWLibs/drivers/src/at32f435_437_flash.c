@@ -3,7 +3,8 @@
   * @file     at32f435_437_flash.c
   * @brief    contains all the functions for the flash firmware library
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -739,7 +740,7 @@ flash_status_type flash_user_system_data_program(uint32_t address, uint8_t data)
 
 /**
   * @brief  config erase/program protection for the desired sectors.
-  * @param  sector_bits:
+  * @param  sector_bits(1:ENABLE, 0:DISABLE)
   *         the pointer of the address of the sectors to be erase/program protected.
   *         general bit 0~31 every bit is used to protect the 4KB bytes, bit 62~32
   *         every bit is used to protect the 128KB bytes
@@ -1002,7 +1003,7 @@ flash_status_type flash_slib_enable(uint32_t pwd, uint16_t start_sector, uint16_
   flash_status_type status = FLASH_OPERATE_DONE;
 
   /*check range param limits*/
-  if((start_sector>=inst_start_sector) || ((inst_start_sector > end_sector) && \
+  if((start_sector > inst_start_sector) || ((inst_start_sector > end_sector) && \
      (inst_start_sector != 0xFFFF)) || (start_sector > end_sector))
     return FLASH_PROGRAM_ERROR;
 

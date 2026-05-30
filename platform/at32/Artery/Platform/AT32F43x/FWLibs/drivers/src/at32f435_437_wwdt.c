@@ -3,7 +3,8 @@
   * @file     at32f435_437_wwdt.c
   * @brief    contains all the functions for the wwdt firmware library
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -102,6 +103,16 @@ void wwdt_interrupt_enable(void)
 flag_status wwdt_flag_get(void)
 {
   return (flag_status)WWDT->sts_bit.rldf;
+}
+
+/**
+  * @brief  wwdt reload counter interrupt flag get
+  * @param  none
+  * @retval state of reload counter interrupt flag
+  */
+flag_status wwdt_interrupt_flag_get(void)
+{
+  return (flag_status)(WWDT->sts_bit.rldf && WWDT->cfg_bit.rldien);
 }
 
 /**

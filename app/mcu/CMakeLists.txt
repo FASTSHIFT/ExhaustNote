@@ -62,6 +62,7 @@ add_library(at32_bsp STATIC
     ${BSP_DIR}/at_surf_f437_board_key.c
     ${BSP_DIR}/at_surf_f437_board_joystick.c
     ${BSP_DIR}/at_surf_f437_board_variable_resistor.c
+    ${BSP_DIR}/at_surf_f437_board_sd_card.c
     ${BSP_DIR}/i2c_application.c
 )
 target_include_directories(at32_bsp PUBLIC
@@ -78,7 +79,8 @@ add_library(fatfs STATIC
     ${FATFS_DIR}/fatfs_lib/source/ff.c
     ${FATFS_DIR}/fatfs_lib/source/ffsystem.c
     ${FATFS_DIR}/fatfs_lib/source/ffunicode.c
-    ${FATFS_DIR}/at32_sdio.c
+    # NOTE: at32_sdio.c REMOVED — using at_surf_f437_board_sd_card.c from BSP instead
+    # (at32_sdio.c has duplicate sd_init/sd_power_on without V2.2.4 fixes)
     ${BSP_DIR}/at_surf_f437_board_diskio.c
 )
 target_include_directories(fatfs PUBLIC
@@ -86,7 +88,7 @@ target_include_directories(fatfs PUBLIC
     ${FATFS_DIR}
     ${BSP_DIR}
 )
-target_link_libraries(fatfs PUBLIC at32_hal)
+target_link_libraries(fatfs PUBLIC at32_hal at32_bsp)
 
 # ============================================================
 # ExhaustNote Core Library (platform-independent)
@@ -130,6 +132,8 @@ target_link_libraries(arduino_core PUBLIC at32_hal)
 add_executable(exhaust_mcu
     main.cpp
     audio_i2s.c
+    sd_loader.c
+    car_loader.cpp
     system_call.c
     ${ARTERY_DIR}/Platform/AT32F43x/Core/cxx_stubs.cpp
     ${STARTUP_FILE}

@@ -3,7 +3,8 @@
   * @file     at32f435_437_edma.h
   * @brief    at32f435_437 edma header file
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -47,10 +48,10 @@ extern "C" {
   * @{
   */
 
-#define EDMA_DMERR_INT                   ((uint32_t)0x00000002) /* edma direct mode error intterrupt */
-#define EDMA_DTERR_INT                   ((uint32_t)0x00000004) /* edma data transfer error intterrupt */
-#define EDMA_HDT_INT                     ((uint32_t)0x00000008) /* edma half data transfer intterrupt */
-#define EDMA_FDT_INT                     ((uint32_t)0x00000010) /* edma full data transfer intterrupt */
+#define EDMA_DMERR_INT                   ((uint32_t)0x00000002) /* edma direct mode error interrupt */
+#define EDMA_DTERR_INT                   ((uint32_t)0x00000004) /* edma data transfer error interrupt */
+#define EDMA_HDT_INT                     ((uint32_t)0x00000008) /* edma half data transfer interrupt */
+#define EDMA_FDT_INT                     ((uint32_t)0x00000010) /* edma full data transfer interrupt */
 #define EDMA_FERR_INT                    ((uint32_t)0x00000080) /* edma fifo error interrupt */
 
 /**
@@ -156,7 +157,8 @@ typedef enum
 {
   EDMA_DIR_PERIPHERAL_TO_MEMORY          = 0x00, /*!< data transfer direction: peripheral to memory */
   EDMA_DIR_MEMORY_TO_PERIPHERAL          = 0x01, /*!< data transfer direction: memory to peripheral */
-  EDMA_DIR_MEMORY_TO_MEMORY              = 0x02  /*!< data transfer direction: memory to memory */
+  EDMA_DIR_MEMORY_TO_MEMORY              = 0x02  /*!< data transfer direction: memory to memory,
+                                                      note:if the direction is memory to memory,peripheral_base_addr as source and memory_base_addr as destnation*/
 } edma_dir_type;
 
 /**
@@ -1019,6 +1021,7 @@ edma_memory_type edma_memory_target_get(edma_stream_type *edma_streamx);
 flag_status edma_stream_status_get(edma_stream_type *edma_streamx);
 uint8_t edma_fifo_status_get(edma_stream_type *edma_streamx);
 flag_status edma_flag_get(uint32_t edma_flag);
+flag_status edma_interrupt_flag_get(uint32_t edma_flag);
 void edma_flag_clear(uint32_t edma_flag);
 
 /* edma 2d controller function */
@@ -1039,8 +1042,10 @@ void edmamux_generator_config(edmamux_generator_type *edmamux_gen_x, edmamux_gen
 void edmamux_sync_interrupt_enable(edmamux_channel_type *edmamux_channelx, confirm_state new_state);
 void edmamux_generator_interrupt_enable(edmamux_generator_type *edmamux_gen_x, confirm_state new_state);
 flag_status edmamux_sync_flag_get(uint32_t flag);
+flag_status edmamux_sync_interrupt_flag_get(uint32_t flag);
 void edmamux_sync_flag_clear(uint32_t flag);
 flag_status edmamux_generator_flag_get(uint32_t flag);
+flag_status edmamux_generator_interrupt_flag_get(uint32_t flag);
 void edmamux_generator_flag_clear(uint32_t flag);
 
 /**

@@ -3,7 +3,8 @@
   * @file     at32f435_437_scfg.h
   * @brief    at32f435_437 system config header file
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -65,9 +66,7 @@ typedef enum
   */
 typedef enum
 {
-  SCFG_IR_SOURCE_TMR10                   = 0x00, /* infrared signal source select tmr10 */
-  SCFG_IR_SOURCE_USART1                  = 0x01, /* infrared signal source select usart1 */
-  SCFG_IR_SOURCE_USART2                  = 0x02  /* infrared signal source select usart2 */
+  SCFG_IR_SOURCE_TMR10                   = 0x00  /* infrared signal source select tmr10 */
 } scfg_ir_source_type;
 
 /**

@@ -3,7 +3,8 @@
   * @file     at32f435_437_sdio.h
   * @brief    at32f435_437 sdio header file
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -586,6 +587,7 @@ void sdio_clock_enable(sdio_type *sdio_x, confirm_state new_state);
 void sdio_dma_enable(sdio_type *sdio_x, confirm_state new_state);
 void sdio_interrupt_enable(sdio_type *sdio_x, uint32_t int_opt,  confirm_state new_state);
 flag_status sdio_flag_get(sdio_type *sdio_x, uint32_t flag);
+flag_status sdio_interrupt_flag_get(sdio_type *sdio_x, uint32_t flag);
 void sdio_flag_clear(sdio_type *sdio_x, uint32_t flag);
 void sdio_command_config(sdio_type *sdio_x, sdio_command_struct_type *command_struct);
 void sdio_command_state_machine_enable(sdio_type *sdio_x, confirm_state new_state);
