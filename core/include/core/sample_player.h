@@ -28,6 +28,18 @@ public:
     /// @param frames  Number of frames to generate
     void process(sample_t* output, size_t frames);
 
+    /// Generate samples at variable playback rate (pitch shift).
+    /// @param output  Output buffer to fill
+    /// @param frames  Number of frames to generate
+    /// @param rate    Playback rate (1.0 = original, 2.0 = octave up, 0.5 = octave down)
+    void process(sample_t* output, size_t frames, float rate);
+
+    /// Generate samples into a float buffer at variable rate.
+    /// @param output  Float output buffer
+    /// @param frames  Number of frames to generate
+    /// @param rate    Playback rate
+    void process_float(float* output, size_t frames, float rate);
+
     /// Check if a sample is loaded.
     bool is_loaded() const { return data_ != nullptr; }
 
