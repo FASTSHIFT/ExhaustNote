@@ -156,8 +156,8 @@ int main(int, char**)
     trans_config.final_drive = 4.44f;
     trans_config.rpm_idle = 900.0f;
     trans_config.rpm_redline = 9000.0f;
-    trans_config.rpm_upshift = 0.88f;
-    trans_config.rpm_downshift = 0.30f;
+    trans_config.rpm_upshift = 2.0f; // >1.0 = never auto-upshift (manual mode)
+    trans_config.rpm_downshift = -1.0f; // <0 = never auto-downshift (manual mode)
     Transmission transmission(trans_config);
 
     // --- Init SDL + OpenGL ---
