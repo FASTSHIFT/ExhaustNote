@@ -1,3 +1,4 @@
+#include "core/engine_effects.h"
 #include "core/engine_voice.h"
 #include "core/mixer.h"
 #include "core/transmission.h"
@@ -73,7 +74,12 @@ struct AudioState {
     std::mutex mutex;
     EngineVoice engine;
     Mixer mixer;
+    CombustionPulse combustion;
+    ThrottleTransient transient;
+    IdleFluctuation idle_fluct;
     EngineVoice::Params params;
+    float throttle = 0.0f;
+    float dt = 0.016f;
     bool engine_running = false;
 };
 
@@ -89,10 +95,36 @@ static void audio_callback(void* userdata, Uint8* stream, int len)
     }
 
     sample_t engine_buf[2048];
+    float effects_buf[2048];
     frames = std::min(frames, size_t(2048));
+
+    // Apply idle fluctuation to RPM
+    EngineVoice::Params params = state->params;
+    params.rpm += state->idle_fluct.update(params.rpm, state->dt);
+    if (params.rpm < 500.0f)
+        params.rpm = 500.0f;
+
+    // Process main engine voice
+    state->engine.process(params, engine_buf, frames);
+
+    // Apply throttle transient gain (no rev limiter on audio — it's in physics now)
+    float transient_gain = state->transient.update(state->throttle, state->dt);
+
+    // Add combustion pulses
+    std::memset(effects_buf, 0, frames * sizeof(float));
+    state->combustion.process(effects_buf, frames, params.rpm, 44100);
+
+    // Mix everything
     state->mixer.clear(frames);
-    state->engine.process(state->params, engine_buf, frames);
-    state->mixer.add(engine_buf, frames, 1.0f);
+    state->mixer.add(engine_buf, frames, transient_gain);
+    // Add combustion pulses as sample_t
+    sample_t pulse_buf[2048];
+    for (size_t i = 0; i < frames; ++i) {
+        float s = effects_buf[i];
+        s = std::fmax(-32768.0f, std::fmin(32767.0f, s));
+        pulse_buf[i] = static_cast<sample_t>(s);
+    }
+    state->mixer.add(pulse_buf, frames, 1.0f);
     state->mixer.finalize(reinterpret_cast<sample_t*>(stream), frames);
 }
 
@@ -145,6 +177,52 @@ int main(int, char**)
     audio_state.engine.set_offload_layers_auto(offload_configs, kNumOffload);
     audio_state.engine.set_engine_config(kCylinders, kDefaultSampleRate);
     audio_state.mixer.set_master_volume(0.8f);
+
+    // --- Engine Effects ---
+    // Combustion pulse: low-frequency thud simulating cylinder firing
+    // Real combustion impulse is a low "thump" (~100-150Hz), not a click
+    static sample_t pulse_sample[512];
+    for (int i = 0; i < 512; ++i) {
+        float t = static_cast<float>(i) / 44100.0f;
+        float env = std::exp(-t * 150.0f); // Slower decay (~7ms, more body)
+        // Low frequency content only: 120Hz fundamental + 60Hz sub
+        float wave = std::sin(t * 120.0f * 6.28f) * 0.6f
+            + std::sin(t * 60.0f * 6.28f) * 0.4f;
+        pulse_sample[i] = static_cast<sample_t>(wave * env * 12000.0f);
+    }
+    audio_state.combustion.load_pulse(pulse_sample, 512);
+    CombustionPulse::Config pulse_config;
+    pulse_config.cylinders = kCylinders;
+    pulse_config.volume = 0.2f; // Subtle, not dominant
+    pulse_config.rpm_fade_start = 3000.0f; // Start fading earlier
+    pulse_config.rpm_fade_end = 5000.0f; // Gone by mid-range
+    // V8 firing order: slight variation only
+    pulse_config.cyl_volumes[0] = 1.0f;
+    pulse_config.cyl_volumes[1] = 0.9f;
+    pulse_config.cyl_volumes[2] = 1.0f;
+    pulse_config.cyl_volumes[3] = 0.95f;
+    pulse_config.cyl_volumes[4] = 1.0f;
+    pulse_config.cyl_volumes[5] = 0.9f;
+    pulse_config.cyl_volumes[6] = 1.0f;
+    pulse_config.cyl_volumes[7] = 0.95f;
+    audio_state.combustion.set_config(pulse_config);
+
+    // Idle fluctuation
+    IdleFluctuation::Config idle_config;
+    idle_config.amplitude = 25.0f; // ±25 RPM
+    idle_config.rate = 1.0f; // 1 Hz breathing
+    idle_config.rpm_threshold = 1500.0f;
+    audio_state.idle_fluct.set_config(idle_config);
+
+    // Throttle transient
+    ThrottleTransient::Config trans_fx_config;
+    trans_fx_config.attack_gain = 1.25f;
+    trans_fx_config.attack_time = 0.06f;
+    trans_fx_config.decay_time = 0.15f;
+    audio_state.transient.set_config(trans_fx_config);
+
+    // Rev limiter is now handled in the physics model (Transmission class)
+    // It cuts fuel (throttle=0) causing RPM to naturally oscillate at redline
 
     // --- Transmission ---
     Transmission::Config trans_config;
@@ -291,6 +369,8 @@ int main(int, char**)
             audio_state.params.rpm = transmission.rpm();
             audio_state.params.throttle = throttle;
             audio_state.params.load = transmission.load();
+            audio_state.throttle = throttle;
+            audio_state.dt = dt;
             audio_state.engine_running = engine_on;
         }
 
@@ -329,11 +409,19 @@ int main(int, char**)
         // RPM gauge
         ImGui::Text("RPM");
         float rpm_frac = (transmission.rpm() - trans_config.rpm_idle) / (trans_config.rpm_redline - trans_config.rpm_idle);
-        ImVec4 rpm_color = rpm_frac > 0.85f ? ImVec4(1, 0, 0, 1) : ImVec4(0.2f, 0.8f, 0.2f, 1);
+        ImVec4 rpm_color = transmission.rev_limiter_active()
+            ? ImVec4(1, 0.2f, 0.2f, 1)
+            : (rpm_frac > 0.85f ? ImVec4(1, 0.6f, 0, 1) : ImVec4(0.2f, 0.8f, 0.2f, 1));
         ImGui::PushStyleColor(ImGuiCol_PlotHistogram, rpm_color);
         ImGui::ProgressBar(rpm_frac, ImVec2(-1, 30), "");
         ImGui::PopStyleColor();
-        ImGui::Text("%.0f / %.0f RPM", transmission.rpm(), trans_config.rpm_redline);
+        ImGui::Text("%.0f / %.0f RPM %s", transmission.rpm(), trans_config.rpm_redline,
+            transmission.rev_limiter_active() ? "[LIMITER]" : "");
+        if (transmission.afterfire() > 0.01f) {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), " BACKFIRE %.0f%%",
+                transmission.afterfire() * 100.0f);
+        }
 
         ImGui::Spacing();
 
@@ -348,16 +436,19 @@ int main(int, char**)
 
         ImGui::Spacing();
 
-        // Throttle slider
-        ImGui::Text("Throttle [W/S]");
-        ImGui::SliderFloat("##throttle", &throttle, 0.0f, 1.0f, "%.0f%%");
+        // Throttle slider (directly controls engine torque via physics model)
+        ImGui::Text("Throttle [W/S or drag slider]");
+        float throttle_pct = throttle * 100.0f;
+        if (ImGui::SliderFloat("##throttle", &throttle_pct, 0.0f, 100.0f, "%.0f%%")) {
+            throttle = throttle_pct / 100.0f;
+        }
 
         ImGui::Spacing();
 
         // Volume
-        float vol = audio_state.mixer.master_volume();
-        if (ImGui::SliderFloat("Volume", &vol, 0.0f, 1.0f, "%.0f%%")) {
-            audio_state.mixer.set_master_volume(vol);
+        float vol_pct = audio_state.mixer.master_volume() * 100.0f;
+        if (ImGui::SliderFloat("Volume", &vol_pct, 0.0f, 100.0f, "%.0f%%")) {
+            audio_state.mixer.set_master_volume(vol_pct / 100.0f);
         }
 
         ImGui::Separator();

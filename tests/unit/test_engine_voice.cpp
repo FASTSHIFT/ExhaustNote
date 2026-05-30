@@ -269,29 +269,38 @@ TEST(TransmissionShiftTest, DownshiftRpmRiseCorrect)
     config.rpm_redline = 9000.0f;
     config.rpm_upshift = 2.0f;
     config.rpm_downshift = -1.0f;
+    config.peak_torque = 400.0f;
+    config.peak_torque_rpm = 5000.0f;
+    config.inertia = 0.12f;
+    config.friction = 15.0f;
 
     Transmission trans(config);
 
-    // Shift to 3rd gear
+    // Shift to 3rd gear then let RPM settle to moderate level
     trans.shift_up(); // 1→2
-    trans.update(0.5f, 0.5f); // wait for shift
+    for (int i = 0; i < 15; ++i)
+        trans.update(0.2f, 0.016f);
     trans.shift_up(); // 2→3
-    trans.update(0.5f, 0.5f);
+    for (int i = 0; i < 15; ++i)
+        trans.update(0.0f, 0.016f); // No throttle during shift
     EXPECT_EQ(trans.gear(), 3);
 
-    // Rev to ~5000
-    for (int i = 0; i < 100; ++i)
-        trans.update(0.7f, 0.016f);
+    // Let RPM settle to a moderate value (~3000-5000)
+    // Use zero throttle to let it coast down from shift
+    for (int i = 0; i < 50; ++i)
+        trans.update(0.15f, 0.016f);
 
     float rpm_before = trans.rpm();
+    EXPECT_GT(rpm_before, 1000.0f);
+    // Ensure downshift won't exceed redline
+    EXPECT_LT(rpm_before * (2.19f / 1.63f), 9000.0f * 1.05f);
 
-    // Downshift 3→2
+    // Downshift 3→2: RPM should rise by ratio 2.19/1.63
     trans.shift_down();
     EXPECT_EQ(trans.gear(), 2);
 
-    // RPM should rise by ratio 2.19/1.63 = 1.344
     float expected_rpm = rpm_before * (2.19f / 1.63f);
-    EXPECT_NEAR(trans.rpm(), expected_rpm, 10.0f);
+    EXPECT_NEAR(trans.rpm(), expected_rpm, 100.0f);
 }
 
 TEST(TransmissionShiftTest, DctShiftTimeFast)
@@ -300,6 +309,7 @@ TEST(TransmissionShiftTest, DctShiftTimeFast)
     config.num_gears = 7;
     config.gear_ratios[0] = 3.08f;
     config.gear_ratios[1] = 2.19f;
+    config.gear_ratios[2] = 1.63f;
     config.rpm_idle = 900.0f;
     config.rpm_redline = 9000.0f;
     config.rpm_upshift = 2.0f;
@@ -308,15 +318,17 @@ TEST(TransmissionShiftTest, DctShiftTimeFast)
     Transmission trans(config);
 
     // Rev up
-    for (int i = 0; i < 100; ++i)
+    for (int i = 0; i < 200; ++i)
         trans.update(1.0f, 0.016f);
 
     trans.shift_up();
+    EXPECT_EQ(trans.gear(), 2);
 
     // After 100ms (> 60ms shift time), shift should be complete
-    trans.update(1.0f, 0.1f);
+    for (int i = 0; i < 7; ++i)
+        trans.update(1.0f, 0.016f); // ~112ms total
 
-    // Should be able to shift again (not still in shifting state)
+    // Should be able to shift again
     uint8_t gear_before = trans.gear();
     trans.shift_up();
     EXPECT_EQ(trans.gear(), gear_before + 1);

@@ -5,6 +5,7 @@ add_library(exhaust_core STATIC
     src/mixer.cpp
     src/transmission.cpp
     src/engine_voice.cpp
+    src/engine_effects.cpp
 )
 
 target_include_directories(exhaust_core PUBLIC

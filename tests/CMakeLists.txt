@@ -18,6 +18,7 @@ add_executable(exhaust_tests
     unit/test_mixer.cpp
     unit/test_transmission.cpp
     unit/test_engine_voice.cpp
+    unit/test_engine_effects.cpp
 )
 
 target_link_libraries(exhaust_tests PRIVATE
