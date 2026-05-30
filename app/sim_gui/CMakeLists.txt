@@ -23,7 +23,9 @@ set(IMPLOT_SOURCES
 
 add_executable(exhaust_sim_gui
     main.cpp
+    sim_audio.cpp
     wav_loader.cpp
+    gui_gauges.cpp
     ${IMGUI_SOURCES}
     ${IMPLOT_SOURCES}
 )

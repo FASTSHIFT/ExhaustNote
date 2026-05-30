@@ -19,24 +19,31 @@ Transmission::Transmission(const Config& config)
 float Transmission::torque_at_rpm(float rpm) const
 {
     // Simplified torque curve: parabolic shape peaking at peak_torque_rpm
-    // T(rpm) = peak_torque * [1 - ((rpm - peak_rpm) / width)^2]
-    // Width chosen so torque is ~60% at idle and ~70% at redline
+    // Torque curve: ensures non-zero torque from idle to redline.
+    // Uses a wider parabola with a guaranteed minimum floor.
     float peak_rpm = config_.peak_torque_rpm;
-    float width = (config_.rpm_redline - config_.rpm_idle) * 0.7f;
+    // Width covers the full RPM range so curve never goes to zero in operating range
+    float width = std::fmax(peak_rpm - config_.rpm_idle, config_.rpm_redline - peak_rpm) * 1.1f;
     float x = (rpm - peak_rpm) / width;
     float t = config_.peak_torque * (1.0f - x * x);
 
-    // Clamp: torque can't go negative from the curve
-    if (t < 0.0f)
-        t = 0.0f;
+    // Floor: minimum 15% torque at any RPM in operating range
+    float floor_torque = config_.peak_torque * 0.15f;
+    if (t < floor_torque && rpm >= config_.rpm_idle * 0.5f && rpm <= config_.rpm_redline)
+        t = floor_torque;
 
-    // Past redline: torque drops rapidly (simulates valve float / fuel cut zone)
+    // Below idle: taper to zero
+    if (rpm < config_.rpm_idle) {
+        t *= rpm / config_.rpm_idle;
+    }
+
+    // Past redline: torque drops rapidly
     if (rpm > config_.rpm_redline) {
         float over = (rpm - config_.rpm_redline) / 500.0f;
         t *= std::fmax(0.0f, 1.0f - over);
     }
 
-    return t;
+    return std::fmax(0.0f, t);
 }
 
 void Transmission::update(float throttle, float dt)
@@ -182,7 +189,9 @@ void Transmission::shift_up()
         gear_++;
         float new_ratio = config_.gear_ratios[gear_ - 1];
         shifting_ = true;
-        shift_timer_ = 0.06f; // 60ms DCT shift
+        shift_timer_ = 0.08f; // 80ms DCT shift
+        // RPM changes instantly by gear ratio (physics correct)
+        // The display/audio low-pass filter handles the smooth transition
         rpm_ *= (new_ratio / old_ratio);
         rpm_ = std::fmax(config_.rpm_idle, rpm_);
     }
@@ -195,9 +204,10 @@ void Transmission::shift_down()
         gear_--;
         float new_ratio = config_.gear_ratios[gear_ - 1];
         shifting_ = true;
-        shift_timer_ = 0.08f; // 80ms DCT downshift (blip)
+        shift_timer_ = 0.10f; // 100ms downshift with blip
+        // RPM rises instantly by gear ratio
         rpm_ *= (new_ratio / old_ratio);
-        rpm_ = std::fmin(config_.rpm_redline * 1.05f, rpm_);
+        rpm_ = std::fmin(config_.rpm_redline * 1.02f, rpm_);
     }
 }
 

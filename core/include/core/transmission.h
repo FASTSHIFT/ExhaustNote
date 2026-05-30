@@ -59,6 +59,20 @@ public:
     /// Get afterfire intensity [0, 1] (for triggering pop sounds).
     float afterfire() const { return afterfire_; }
 
+    /// Get approximate vehicle speed in km/h.
+    /// Assumes wheel radius of 0.33m.
+    float speed_kmh() const
+    {
+        if (gear_ == 0 || config_.num_gears == 0)
+            return 0.0f;
+        float overall = config_.gear_ratios[gear_ - 1] * config_.final_drive;
+        if (overall < 0.01f)
+            return 0.0f;
+        // speed = RPM / overall_ratio * wheel_circumference / 60
+        // wheel_circ = 2 * pi * 0.33 = 2.073m
+        return (rpm_ / overall) * 2.073f * 60.0f / 1000.0f;
+    }
+
     /// Set external load torque (Nm). Simulates drivetrain resistance.
     /// Higher load = slower RPM rise, more realistic feel.
     void set_external_load(float torque_nm) { external_load_ = torque_nm; }
