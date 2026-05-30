@@ -55,12 +55,13 @@ void Transmission::update(float throttle, float dt)
 void Transmission::shift_up()
 {
     if (gear_ < config_.num_gears && !shifting_) {
+        // RPM after shift = RPM_before × (new_gear_ratio / old_gear_ratio)
+        float old_ratio = config_.gear_ratios[gear_ - 1];
         gear_++;
+        float new_ratio = config_.gear_ratios[gear_ - 1];
         shifting_ = true;
-        shift_timer_ = 0.3f; // 300ms shift duration
-        // RPM drops on upshift
-        float ratio = config_.gear_ratios[gear_ - 1] / config_.gear_ratios[gear_ - 2];
-        rpm_ *= ratio;
+        shift_timer_ = 0.06f; // 60ms DCT shift
+        rpm_ *= (new_ratio / old_ratio);
         rpm_ = std::fmax(config_.rpm_idle, rpm_);
     }
 }
@@ -68,12 +69,12 @@ void Transmission::shift_up()
 void Transmission::shift_down()
 {
     if (gear_ > 1 && !shifting_) {
+        float old_ratio = config_.gear_ratios[gear_ - 1];
         gear_--;
+        float new_ratio = config_.gear_ratios[gear_ - 1];
         shifting_ = true;
-        shift_timer_ = 0.2f; // 200ms shift duration
-        // RPM rises on downshift
-        float ratio = config_.gear_ratios[gear_ - 1] / config_.gear_ratios[gear_];
-        rpm_ *= ratio;
+        shift_timer_ = 0.08f; // 80ms DCT downshift (blip)
+        rpm_ *= (new_ratio / old_ratio);
         rpm_ = std::fmin(config_.rpm_redline, rpm_);
     }
 }

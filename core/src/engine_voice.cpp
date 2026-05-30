@@ -54,31 +54,37 @@ void EngineVoice::auto_fill_envelopes(LayerConfig* layers, uint8_t num_layers)
         float prev_rpm = (i > 0) ? layers[i - 1].rpm : rpm - 1000.0f;
         float next_rpm = (i < num_layers - 1) ? layers[i + 1].rpm : rpm + 1000.0f;
 
-        float half_down = (rpm - prev_rpm) * 0.5f;
-        float half_up = (next_rpm - rpm) * 0.5f;
+        // Midpoints between this layer and neighbors
+        float mid_down = (i > 0) ? (prev_rpm + rpm) * 0.5f : 0.0f;
+        float mid_up = (i < num_layers - 1) ? (rpm + next_rpm) * 0.5f : 99999.0f;
 
-        // Trapezoidal envelope with 50% overlap between neighbors
+        // Full overlap: fade-in starts where previous layer's fade-out starts
+        // and ends at the midpoint. This ensures sum of gains = 1.0 at midpoint.
         if (i == 0) {
             layers[i].vol_in_start = 0.0f;
             layers[i].vol_in_end = 0.0f;
         } else {
-            layers[i].vol_in_start = rpm - half_down;
-            layers[i].vol_in_end = rpm - half_down * 0.3f;
+            // Fade in from previous layer's center to midpoint
+            layers[i].vol_in_start = prev_rpm;
+            layers[i].vol_in_end = mid_down;
         }
 
         if (i == num_layers - 1) {
             layers[i].vol_out_start = 99999.0f;
             layers[i].vol_out_end = 99999.0f;
         } else {
-            layers[i].vol_out_start = rpm + half_up * 0.3f;
-            layers[i].vol_out_end = rpm + half_up;
+            // Fade out from midpoint to next layer's center
+            layers[i].vol_out_start = mid_up;
+            layers[i].vol_out_end = next_rpm;
         }
 
-        // Pitch range: at center RPM pitch=1.0, at edges pitch=edge_rpm/center_rpm
-        layers[i].pitch_start_rpm = rpm - half_down;
-        layers[i].pitch_end_rpm = rpm + half_up;
-        layers[i].min_pitch = (rpm - half_down) / rpm;
-        layers[i].max_pitch = (rpm + half_up) / rpm;
+        // Pitch range: spans from previous midpoint to next midpoint
+        float pitch_lo = (i > 0) ? mid_down : rpm * 0.5f;
+        float pitch_hi = (i < num_layers - 1) ? mid_up : rpm * 1.5f;
+        layers[i].pitch_start_rpm = pitch_lo;
+        layers[i].pitch_end_rpm = pitch_hi;
+        layers[i].min_pitch = pitch_lo / rpm;
+        layers[i].max_pitch = pitch_hi / rpm;
     }
 }
 
@@ -159,12 +165,35 @@ void EngineVoice::process(const Params& params, sample_t* output, size_t frames)
     float dt = static_cast<float>(frames) / static_cast<float>(sample_rate_);
     float alpha = 1.0f - std::exp(-dt / gain_smooth_tc_);
 
-    // --- Compute target gains (trapezoidal) ---
-    for (uint8_t i = 0; i < num_onload_; ++i) {
-        onload_target_gains_[i] = compute_trapezoid_gain(params.rpm, onload_configs_[i]);
+    // --- Compute target gains (trapezoidal + equal-power normalize) ---
+    {
+        float sum_sq = 0.0f;
+        for (uint8_t i = 0; i < num_onload_; ++i) {
+            float g = compute_trapezoid_gain(params.rpm, onload_configs_[i]);
+            onload_target_gains_[i] = g;
+            sum_sq += g * g;
+        }
+        // Equal-power normalization: ensures constant perceived loudness
+        if (sum_sq > 0.01f) {
+            float scale = 1.0f / std::sqrt(sum_sq);
+            for (uint8_t i = 0; i < num_onload_; ++i) {
+                onload_target_gains_[i] *= scale;
+            }
+        }
     }
-    for (uint8_t i = 0; i < num_offload_; ++i) {
-        offload_target_gains_[i] = compute_trapezoid_gain(params.rpm, offload_configs_[i]);
+    {
+        float sum_sq = 0.0f;
+        for (uint8_t i = 0; i < num_offload_; ++i) {
+            float g = compute_trapezoid_gain(params.rpm, offload_configs_[i]);
+            offload_target_gains_[i] = g;
+            sum_sq += g * g;
+        }
+        if (sum_sq > 0.01f) {
+            float scale = 1.0f / std::sqrt(sum_sq);
+            for (uint8_t i = 0; i < num_offload_; ++i) {
+                offload_target_gains_[i] *= scale;
+            }
+        }
     }
 
     // --- Smooth gains ---

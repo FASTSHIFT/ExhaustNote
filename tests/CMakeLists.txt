@@ -17,6 +17,7 @@ add_executable(exhaust_tests
     unit/test_dsp.cpp
     unit/test_mixer.cpp
     unit/test_transmission.cpp
+    unit/test_engine_voice.cpp
 )
 
 target_link_libraries(exhaust_tests PRIVATE

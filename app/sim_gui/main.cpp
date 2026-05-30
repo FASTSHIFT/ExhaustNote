@@ -148,7 +148,9 @@ int main(int, char**)
 
     // --- Transmission ---
     Transmission::Config trans_config;
-    trans_config.num_gears = 7; // Ferrari 458 has 7-speed DCT
+    // Ferrari 458 Italia 7-speed dual-clutch (Getrag)
+    // Ratios from public spec sheets
+    trans_config.num_gears = 7;
     trans_config.gear_ratios[0] = 3.08f;
     trans_config.gear_ratios[1] = 2.19f;
     trans_config.gear_ratios[2] = 1.63f;
