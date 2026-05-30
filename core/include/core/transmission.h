@@ -59,6 +59,13 @@ public:
     /// Get afterfire intensity [0, 1] (for triggering pop sounds).
     float afterfire() const { return afterfire_; }
 
+    /// Set external load torque (Nm). Simulates drivetrain resistance.
+    /// Higher load = slower RPM rise, more realistic feel.
+    void set_external_load(float torque_nm) { external_load_ = torque_nm; }
+
+    /// Get current external load.
+    float external_load() const { return external_load_; }
+
     /// Manual shift up.
     void shift_up();
 
@@ -81,6 +88,9 @@ private:
 
     // Smoothed throttle (simulates intake manifold lag)
     float smoothed_throttle_ = 0.0f;
+
+    // External load (drivetrain resistance)
+    float external_load_ = 0.0f;
 
     // Rev limiter state
     bool rev_limiter_active_ = false;

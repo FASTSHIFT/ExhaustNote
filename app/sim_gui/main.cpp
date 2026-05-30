@@ -445,6 +445,16 @@ int main(int, char**)
 
         ImGui::Spacing();
 
+        // External load slider (simulates drivetrain resistance)
+        // Load scales quadratically with RPM (like real aero + road load)
+        ImGui::Text("Load (road resistance)");
+        static float load_nm = 200.0f; // Default: normal driving
+        ImGui::SliderFloat("##load", &load_nm, 0.0f, 500.0f, "%.0f Nm");
+        transmission.set_external_load(load_nm);
+        ImGui::Text("0=neutral, 200=road, 400=hill, 500=max");
+
+        ImGui::Spacing();
+
         // Volume
         float vol_pct = audio_state.mixer.master_volume() * 100.0f;
         if (ImGui::SliderFloat("Volume", &vol_pct, 0.0f, 100.0f, "%.0f%%")) {

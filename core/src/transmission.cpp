@@ -102,16 +102,34 @@ void Transmission::update(float throttle, float dt)
         engine_brake = config_.engine_brake * (1.0f - effective_throttle / 0.05f);
     }
 
+    // --- Effective inertia (gear-dependent) ---
+    // I_eff = I_engine + I_vehicle_reflected
+    // I_vehicle_reflected = m * r² / (gear_ratio * final_drive)²
+    // This makes high gears feel "heavier" (slower RPM rise)
+    float gear_ratio = config_.gear_ratios[gear_ - 1];
+    float overall_ratio = gear_ratio * config_.final_drive;
+    // Use external_load_ as a proxy for vehicle mass × wheel_radius²
+    // external_load_ in Nm maps to equivalent vehicle_mass * r² in kg·m²
+    // Typical: 1485kg * 0.33² = 162 kg·m² for Ferrari 458
+    float vehicle_inertia_reflected = external_load_ / (overall_ratio * overall_ratio);
+    float effective_inertia = config_.inertia + vehicle_inertia_reflected;
+
+    // --- Road load (speed-dependent resistance) ---
+    // Simplified: road_load ∝ RPM² (since speed ∝ RPM/gear_ratio)
+    float rpm_normalized = (rpm_ - config_.rpm_idle) / (config_.rpm_redline - config_.rpm_idle);
+    rpm_normalized = std::fmax(0.0f, std::fmin(1.0f, rpm_normalized));
+    float road_load = external_load_ * 0.1f * rpm_normalized * rpm_normalized;
+
     // --- Net torque and angular acceleration ---
-    float net_torque = combustion_torque - friction_torque - engine_brake;
+    float net_torque = combustion_torque - friction_torque - engine_brake - road_load;
 
     // Sign of friction opposes motion
     if (omega > 0.0f && net_torque < -friction_torque) {
         net_torque = -friction_torque;
     }
 
-    // Angular acceleration: α = τ / I
-    float alpha = net_torque / config_.inertia;
+    // Angular acceleration: α = τ / I_effective
+    float alpha = net_torque / effective_inertia;
 
     // Integrate: ω_new = ω + α·dt
     omega += alpha * dt;
