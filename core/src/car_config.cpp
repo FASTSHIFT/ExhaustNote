@@ -3,8 +3,11 @@
 #include <cJSON.h>
 #include <cstdio>
 #include <cstring>
+
+#ifndef EXHAUST_MCU
 #include <dirent.h>
 #include <sys/stat.h>
+#endif
 
 namespace exhaust {
 
@@ -109,6 +112,7 @@ bool load_car_config(const std::string& json_path, CarConfig& config)
     return true;
 }
 
+#ifndef EXHAUST_MCU
 std::vector<std::pair<std::string, std::string>> scan_cars(const std::string& cars_dir)
 {
     std::vector<std::pair<std::string, std::string>> result;
@@ -129,7 +133,6 @@ std::vector<std::pair<std::string, std::string>> scan_cars(const std::string& ca
 
         std::string json_path = subdir + "/car.json";
         if (stat(json_path.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
-            // Quick-parse just the name
             CarConfig cfg;
             if (load_car_config(json_path, cfg)) {
                 std::string display = cfg.name + " (" + cfg.engine_type + ")";
@@ -141,5 +144,12 @@ std::vector<std::pair<std::string, std::string>> scan_cars(const std::string& ca
     closedir(dir);
     return result;
 }
+#else
+// MCU: no directory scanning, load specific path from SD card
+std::vector<std::pair<std::string, std::string>> scan_cars(const std::string&)
+{
+    return {};
+}
+#endif
 
 } // namespace exhaust

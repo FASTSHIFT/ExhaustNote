@@ -91,3 +91,6 @@ vcpkg_installed/
 Testing/
 .cache/
 imgui.ini
+# AT32 SDK (large, user downloads separately)
+platform/at32/AT32F435_437_Firmware_Library_V2.1.1/
+*.zip
