@@ -15,7 +15,7 @@ public:
         float gear_ratios[8] = { 3.82f, 2.36f, 1.68f, 1.31f, 1.00f, 0.79f };
         uint8_t num_gears = 6;
         float final_drive = 3.73f;
-        float rpm_upshift = 0.85f; ///< Upshift at this fraction of redline
+        float rpm_upshift = 0.97f; ///< Upshift at this fraction of redline (near redline)
         float rpm_downshift = 0.35f; ///< Downshift at this fraction of redline
         bool auto_shift = false; ///< Enable automatic gear shifting
         float rpm_idle = 800.0f;
@@ -89,6 +89,9 @@ public:
     /// Set brake torque (Nm). Applied as pure resistance without affecting inertia.
     void set_brake_torque(float nm) { brake_torque_ = nm; }
     float brake_torque() const { return brake_torque_; }
+
+    /// Mutable access to config (for runtime toggles like auto_shift).
+    Config& config_mut() { return config_; }
 
     /// Manual shift up.
     void shift_up();

@@ -118,8 +118,8 @@ bool load_car(const std::string& json_path,
     tc.peak_torque = cfg.peak_torque;
     tc.peak_torque_rpm = cfg.peak_torque_rpm;
     tc.inertia = cfg.inertia;
-    tc.rpm_upshift = 2.0f; // manual mode
-    tc.rpm_downshift = -1.0f;
+    // Keep default rpm_upshift/rpm_downshift thresholds (0.85/0.35).
+    // auto_shift toggle is controlled at runtime via sim_physics_update.
     transmission = Transmission(tc);
 
     g_car_config = cfg;

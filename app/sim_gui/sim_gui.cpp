@@ -116,6 +116,7 @@ void sim_gui_controls(SimState& state,
     ImGui::SliderFloat("Load (Nm)", &state.physics.load_nm, 0.0f, 500.0f, "%.0f");
     ImGui::SliderFloat("Engine Brake", &state.physics.engine_brake_nm, 10.0f, 200.0f, "%.0f Nm");
     ImGui::SliderFloat("Road Drag", &state.physics.road_coeff, 0.05f, 1.0f, "%.2f");
+    ImGui::Checkbox("Auto Shift", &state.physics.auto_shift);
     if (state.braking)
         ImGui::TextColored(ImVec4(1, 0.3f, 0.3f, 1), "BRAKE [S] (+%.0fNm)", state.physics.brake_force_nm);
     else

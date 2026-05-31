@@ -27,6 +27,7 @@ struct PhysicsConfig {
     float engine_brake_nm = 60.0f;
     float road_coeff = 0.3f;
     float brake_force_nm = 400.0f;
+    bool auto_shift = false;
 };
 
 /// All simulator state in one place — single source of truth.

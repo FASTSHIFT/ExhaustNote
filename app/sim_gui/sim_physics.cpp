@@ -19,6 +19,9 @@ void sim_physics_update(SimState& state, Transmission& trans, float dt)
     // Brake torque (pure resistance, does NOT affect inertia)
     trans.set_brake_torque(state.braking ? state.physics.brake_force_nm : 0.0f);
 
+    // Auto-shift mode (runtime toggle)
+    trans.config_mut().auto_shift = state.physics.auto_shift;
+
     // Step the transmission physics
     trans.update(state.throttle, dt);
 

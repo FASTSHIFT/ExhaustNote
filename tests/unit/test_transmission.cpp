@@ -144,6 +144,29 @@ TEST_F(TransmissionTest, AutoUpshift)
     EXPECT_GT(max_gear_seen, 1);
 }
 
+TEST_F(TransmissionTest, AutoShiftDefaultThresholds)
+{
+    // Verify auto-shift works with DEFAULT thresholds (0.85/0.35)
+    // This catches the bug where load_car() set rpm_upshift=2.0/rpm_downshift=-1.0
+    Transmission::Config auto_config = config;
+    auto_config.auto_shift = true;
+    // Use default thresholds: rpm_upshift=0.85, rpm_downshift=0.35
+    Transmission trans(auto_config);
+    EXPECT_EQ(trans.gear(), 1);
+
+    uint8_t max_gear_seen = 1;
+    // Full throttle — should upshift through multiple gears
+    for (int i = 0; i < 3000; ++i) {
+        trans.update(1.0f, 0.016f);
+        if (trans.gear() > max_gear_seen)
+            max_gear_seen = trans.gear();
+    }
+    // Must reach at least 3rd gear with default thresholds
+    EXPECT_GE(max_gear_seen, 3)
+        << "Auto-shift with default thresholds (0.85/0.35) failed to upshift past gear "
+        << (int)max_gear_seen;
+}
+
 TEST_F(TransmissionTest, Reset)
 {
     Transmission trans(config);
