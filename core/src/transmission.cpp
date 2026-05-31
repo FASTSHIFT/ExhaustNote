@@ -125,7 +125,7 @@ void Transmission::update(float throttle, float dt)
     // Simplified: road_load ∝ RPM² (since speed ∝ RPM/gear_ratio)
     float rpm_normalized = (rpm_ - config_.rpm_idle) / (config_.rpm_redline - config_.rpm_idle);
     rpm_normalized = std::fmax(0.0f, std::fmin(1.0f, rpm_normalized));
-    float road_load = external_load_ * 0.1f * rpm_normalized * rpm_normalized;
+    float road_load = external_load_ * road_load_coeff_ * rpm_normalized * rpm_normalized;
 
     // --- Net torque and angular acceleration ---
     float net_torque = combustion_torque - friction_torque - engine_brake - road_load;

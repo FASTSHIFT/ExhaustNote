@@ -169,8 +169,10 @@ void car_apply(const LoadedCar& car, EngineVoice& engine, Transmission& trans,
     tc.num_gears = car.num_gears;
     for (int i = 0; i < car.num_gears; i++)
         tc.gear_ratios[i] = car.gear_ratios[i];
+    // Engine braking proportional to displacement (bigger engine = more compression braking)
+    tc.engine_brake = car.peak_torque * 0.12f; // ~12% of peak torque
     trans = Transmission(tc);
-    trans.set_external_load(200.0f); // Default drivetrain resistance (Nm)
+    trans.set_external_load(300.0f); // Drivetrain + rolling resistance (Nm)
 
     // Configure combustion pulse
     CombustionPulse::Config pc;

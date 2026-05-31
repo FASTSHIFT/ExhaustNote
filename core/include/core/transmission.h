@@ -75,11 +75,16 @@ public:
     }
 
     /// Set external load torque (Nm). Simulates drivetrain resistance.
-    /// Higher load = slower RPM rise, more realistic feel.
     void set_external_load(float torque_nm) { external_load_ = torque_nm; }
-
-    /// Get current external load.
     float external_load() const { return external_load_; }
+
+    /// Set engine braking torque (Nm). Higher = faster deceleration on overrun.
+    void set_engine_brake(float nm) { config_.engine_brake = nm; }
+    float engine_brake() const { return config_.engine_brake; }
+
+    /// Set road load coefficient. Higher = more speed-dependent drag.
+    void set_road_load_coeff(float c) { road_load_coeff_ = c; }
+    float road_load_coeff() const { return road_load_coeff_; }
 
     /// Manual shift up.
     void shift_up();
@@ -106,6 +111,7 @@ private:
 
     // External load (drivetrain resistance)
     float external_load_ = 0.0f;
+    float road_load_coeff_ = 0.3f; ///< Road load multiplier (0.1=light, 0.3=normal, 0.6=heavy)
 
     // Rev limiter state
     bool rev_limiter_active_ = false;

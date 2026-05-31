@@ -123,8 +123,14 @@ int main(int, char**)
     // --- State ---
     float throttle = 0.0f;
     bool engine_on = false;
+    bool braking = false;
     float smoothed_rpm = 900.0f; // Low-pass filtered RPM for audio/display
     PlotHistory rpm_history, throttle_history, load_history, speed_history;
+
+    // Physics tuning (persistent across car switches)
+    float load_nm = 200.0f;
+    float engine_brake_nm = 60.0f;
+    float road_coeff = 0.3f;
 
     std::printf("\nReady! Use the GUI or keyboard:\n");
     std::printf("  W/Up = throttle, E = engine on/off\n");
@@ -174,24 +180,26 @@ int main(int, char**)
         if (dt > 0.1f)
             dt = 0.1f;
 
-        // Keyboard throttle (continuous)
+        // Keyboard throttle + brake (continuous)
         const Uint8* keys = SDL_GetKeyboardState(nullptr);
+        braking = keys[SDL_SCANCODE_S] || keys[SDL_SCANCODE_DOWN];
         if (keys[SDL_SCANCODE_W] || keys[SDL_SCANCODE_UP]) {
             throttle += 3.0f * dt;
             if (throttle > 1.0f)
                 throttle = 1.0f;
-        } else if (keys[SDL_SCANCODE_S] || keys[SDL_SCANCODE_DOWN]) {
-            throttle -= 5.0f * dt;
-            if (throttle < 0.0f)
-                throttle = 0.0f;
         } else {
             throttle -= 2.0f * dt;
             if (throttle < 0.0f)
                 throttle = 0.0f;
         }
 
-        // Update transmission
+        // Update transmission (apply brake as extra load)
         if (engine_on) {
+            if (braking) {
+                transmission.set_external_load(load_nm + 400.0f); // Brake adds 400Nm resistance
+            } else {
+                transmission.set_external_load(load_nm);
+            }
             transmission.update(throttle, dt);
         }
 
@@ -226,10 +234,11 @@ int main(int, char**)
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
-        // Main window
-        ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(400, 720), ImGuiCond_FirstUseEver);
-        ImGui::Begin("ExhaustNote - Controls");
+        // Main window (fixed position, not draggable)
+        ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(400, 720), ImGuiCond_Always);
+        ImGui::Begin("ExhaustNote - Controls", nullptr,
+            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
 
         // Car selector
         ImGui::Text("Vehicle");
@@ -329,13 +338,19 @@ int main(int, char**)
 
         ImGui::Spacing();
 
-        // External load slider (simulates drivetrain resistance)
-        // Load scales quadratically with RPM (like real aero + road load)
-        ImGui::Text("Load (road resistance)");
-        static float load_nm = 200.0f; // Default: normal driving
-        ImGui::SliderFloat("##load", &load_nm, 0.0f, 500.0f, "%.0f Nm");
-        transmission.set_external_load(load_nm);
-        ImGui::Text("0=neutral, 200=road, 400=hill, 500=max");
+        // Physics tuning (always applied, survives car switch)
+        ImGui::Text("Physics Tuning");
+        ImGui::SliderFloat("Load (Nm)", &load_nm, 0.0f, 500.0f, "%.0f");
+        ImGui::SliderFloat("Engine Brake", &engine_brake_nm, 10.0f, 200.0f, "%.0f Nm");
+        ImGui::SliderFloat("Road Drag", &road_coeff, 0.05f, 1.0f, "%.2f");
+        // Apply engine_brake and road_coeff every frame (survives car switch)
+        transmission.set_engine_brake(engine_brake_nm);
+        transmission.set_road_load_coeff(road_coeff);
+        // NOTE: external_load is set in physics update (includes brake force)
+        if (braking)
+            ImGui::TextColored(ImVec4(1, 0.3f, 0.3f, 1), "BRAKE [S] (+400Nm)");
+        else
+            ImGui::Text("S=brake, W=gas");
 
         ImGui::Spacing();
 
@@ -350,10 +365,11 @@ int main(int, char**)
 
         ImGui::End();
 
-        // --- Plot window ---
-        ImGui::SetNextWindowPos(ImVec2(420, 10), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(850, 700), ImGuiCond_FirstUseEver);
-        ImGui::Begin("Engine Telemetry");
+        // --- Plot window (fixed position) ---
+        ImGui::SetNextWindowPos(ImVec2(420, 10), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(850, 700), ImGuiCond_Always);
+        ImGui::Begin("Engine Telemetry", nullptr,
+            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
 
         if (ImPlot::BeginPlot("RPM", ImVec2(-1, 200))) {
             ImPlot::SetupAxes("Time", "RPM");
