@@ -20,6 +20,12 @@ add_executable(exhaust_tests
     unit/test_engine_voice.cpp
     unit/test_engine_effects.cpp
     unit/test_car_config.cpp
+    unit/test_sim_state.cpp
+    ${CMAKE_SOURCE_DIR}/app/sim_gui/sim_physics.cpp
+)
+
+target_include_directories(exhaust_tests PRIVATE
+    ${CMAKE_SOURCE_DIR}/app/sim_gui
 )
 
 target_link_libraries(exhaust_tests PRIVATE

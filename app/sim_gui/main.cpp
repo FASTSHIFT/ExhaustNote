@@ -1,5 +1,8 @@
-#include "gui_gauges.h"
 #include "sim_audio.h"
+#include "sim_gui.h"
+#include "sim_input.h"
+#include "sim_physics.h"
+#include "sim_state.h"
 
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
@@ -9,32 +12,12 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
 
-#include <cmath>
 #include <cstdio>
-#include <cstring>
-#include <string>
-#include <vector>
+#include <mutex>
 
 using namespace exhaust;
 
-// --- Configuration ---
 static const char* CARS_DIR = "/tmp/ac_cars";
-
-// --- History buffer for plotting ---
-struct PlotHistory {
-    static constexpr int kMaxSize = 600;
-    float data[kMaxSize] = {};
-    int count = 0;
-    void push(float val)
-    {
-        if (count < kMaxSize)
-            data[count++] = val;
-        else {
-            std::memmove(data, data + 1, (kMaxSize - 1) * sizeof(float));
-            data[kMaxSize - 1] = val;
-        }
-    }
-};
 
 int main(int, char**)
 {
@@ -71,7 +54,6 @@ int main(int, char**)
 
     // --- Load first car ---
     Transmission transmission;
-    int current_car = 0;
     load_car(car_list[0].second, audio_state, transmission, pulse_sample, 512);
 
     // --- Init SDL + OpenGL ---
@@ -91,9 +73,8 @@ int main(int, char**)
         1280, 720, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     SDL_GL_MakeCurrent(window, gl_context);
-    SDL_GL_SetSwapInterval(1); // VSync
+    SDL_GL_SetSwapInterval(1);
 
-    // --- Init ImGui ---
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImPlot::CreateContext();
@@ -104,7 +85,7 @@ int main(int, char**)
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
     ImGui_ImplOpenGL3_Init("#version 330");
 
-    // --- Init Audio ---
+    // --- Init Audio Device ---
     SDL_AudioSpec desired = {};
     desired.freq = 44100;
     desired.format = AUDIO_S16SYS;
@@ -120,17 +101,9 @@ int main(int, char**)
         return 1;
     }
 
-    // --- State ---
-    float throttle = 0.0f;
-    bool engine_on = false;
-    bool braking = false;
-    float smoothed_rpm = 900.0f; // Low-pass filtered RPM for audio/display
-    PlotHistory rpm_history, throttle_history, load_history, speed_history;
-
-    // Physics tuning (persistent across car switches)
-    float load_nm = 200.0f;
-    float engine_brake_nm = 60.0f;
-    float road_coeff = 0.3f;
+    // --- Sim State ---
+    SimState state;
+    float master_volume = 0.8f;
 
     std::printf("\nReady! Use the GUI or keyboard:\n");
     std::printf("  W/Up = throttle, E = engine on/off\n");
@@ -139,8 +112,10 @@ int main(int, char**)
     // --- Main loop ---
     bool running = true;
     Uint32 last_tick = SDL_GetTicks();
+    bool prev_engine_on = false;
 
     while (running) {
+        // --- Event handling (discrete keys) ---
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             ImGui_ImplSDL2_ProcessEvent(&event);
@@ -149,13 +124,7 @@ int main(int, char**)
             if (event.type == SDL_KEYDOWN && !event.key.repeat) {
                 switch (event.key.keysym.sym) {
                 case SDLK_e:
-                    engine_on = !engine_on;
-                    if (engine_on) {
-                        SDL_PauseAudioDevice(audio_dev, 0);
-                        transmission.reset();
-                    } else {
-                        SDL_PauseAudioDevice(audio_dev, 1);
-                    }
+                    state.engine_on = !state.engine_on;
                     break;
                 case SDLK_d:
                 case SDLK_RIGHT:
@@ -173,230 +142,72 @@ int main(int, char**)
             }
         }
 
-        // Timing
+        // --- Timing ---
         Uint32 now = SDL_GetTicks();
         float dt = (now - last_tick) / 1000.0f;
         last_tick = now;
         if (dt > 0.1f)
             dt = 0.1f;
 
-        // Keyboard throttle + brake (continuous)
+        // --- Input → State ---
         const Uint8* keys = SDL_GetKeyboardState(nullptr);
-        braking = keys[SDL_SCANCODE_S] || keys[SDL_SCANCODE_DOWN];
-        if (keys[SDL_SCANCODE_W] || keys[SDL_SCANCODE_UP]) {
-            throttle += 3.0f * dt;
-            if (throttle > 1.0f)
-                throttle = 1.0f;
-        } else {
-            throttle -= 2.0f * dt;
-            if (throttle < 0.0f)
-                throttle = 0.0f;
-        }
+        sim_input_update(state, keys, dt);
 
-        // Update transmission (apply brake as extra load)
-        if (engine_on) {
-            if (braking) {
-                transmission.set_external_load(load_nm + 400.0f); // Brake adds 400Nm resistance
-            } else {
-                transmission.set_external_load(load_nm);
-            }
-            transmission.update(throttle, dt);
-        }
-
-        // RPM low-pass filter (simulates mechanical response lag)
-        // Time constant ~80ms: fast enough to follow revving, slow enough to smooth shifts
-        {
-            float rpm_tc = 0.08f; // 80ms time constant
-            float rpm_alpha = 1.0f - std::exp(-dt / rpm_tc);
-            smoothed_rpm += rpm_alpha * (transmission.rpm() - smoothed_rpm);
-        }
-
-        // Update audio params (use smoothed RPM for natural sound transitions)
-        {
-            std::lock_guard<std::mutex> lock(audio_state.mutex);
-            audio_state.params.rpm = smoothed_rpm;
-            audio_state.params.throttle = throttle;
-            audio_state.params.load = transmission.load();
-            audio_state.throttle = throttle;
-            audio_state.dt = dt;
-            audio_state.afterfire_level = transmission.afterfire();
-            audio_state.engine_running = engine_on;
-        }
-
-        // Push to history (use smoothed RPM for display too)
-        rpm_history.push(smoothed_rpm);
-        throttle_history.push(throttle * 100.0f);
-        load_history.push(transmission.load() * 100.0f);
-        speed_history.push(transmission.speed_kmh());
-
-        // --- ImGui Frame ---
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplSDL2_NewFrame();
-        ImGui::NewFrame();
-
-        // Main window (fixed position, not draggable)
-        ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImVec2(400, 720), ImGuiCond_Always);
-        ImGui::Begin("ExhaustNote - Controls", nullptr,
-            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
-
-        // Car selector
-        ImGui::Text("Vehicle");
-        if (ImGui::BeginCombo("##car", car_list[current_car].first.c_str())) {
-            for (int i = 0; i < static_cast<int>(car_list.size()); ++i) {
-                bool selected = (i == current_car);
-                if (ImGui::Selectable(car_list[i].first.c_str(), selected)) {
-                    if (i != current_car) {
-                        current_car = i;
-                        engine_on = false;
-                        SDL_PauseAudioDevice(audio_dev, 1);
-                        load_car(car_list[i].second, audio_state,
-                            transmission, pulse_sample, 512);
-                    }
-                }
-                if (selected)
-                    ImGui::SetItemDefaultFocus();
-            }
-            ImGui::EndCombo();
-        }
-        ImGui::Text("%s | %d cyl | Redline: %.0f",
-            current_car_config().engine_type.c_str(), current_car_config().cylinders, current_car_config().rpm_redline);
-        ImGui::Separator();
-
-        // Engine state
-        ImVec4 color = engine_on ? ImVec4(0.2f, 1.0f, 0.2f, 1.0f) : ImVec4(1.0f, 0.3f, 0.3f, 1.0f);
-        ImGui::TextColored(color, "Engine: %s", engine_on ? "RUNNING" : "OFF");
-        ImGui::SameLine();
-        if (ImGui::Button(engine_on ? "Stop [E]" : "Start [E]")) {
-            engine_on = !engine_on;
-            if (engine_on) {
+        // --- Handle engine on/off transitions ---
+        if (state.engine_on != prev_engine_on) {
+            if (state.engine_on) {
                 SDL_PauseAudioDevice(audio_dev, 0);
                 transmission.reset();
             } else {
                 SDL_PauseAudioDevice(audio_dev, 1);
             }
+            prev_engine_on = state.engine_on;
         }
 
-        ImGui::Separator();
+        // --- Physics → State ---
+        sim_physics_update(state, transmission, dt);
 
-        // RPM bar (uses smoothed RPM)
-        ImGui::Text("RPM");
-        float rpm_frac = (smoothed_rpm - current_car_config().rpm_idle) / (current_car_config().rpm_redline - current_car_config().rpm_idle);
-        rpm_frac = std::fmax(0.0f, std::fmin(1.0f, rpm_frac));
-        ImVec4 rpm_color = transmission.rev_limiter_active()
-            ? ImVec4(1, 0.2f, 0.2f, 1)
-            : (rpm_frac > 0.85f ? ImVec4(1, 0.6f, 0, 1) : ImVec4(0.2f, 0.8f, 0.2f, 1));
-        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, rpm_color);
-        ImGui::ProgressBar(rpm_frac, ImVec2(-1, 24), "");
-        ImGui::PopStyleColor();
-        ImGui::Text("%.0f / %.0f RPM %s", smoothed_rpm, current_car_config().rpm_redline,
-            transmission.rev_limiter_active() ? "[LIMITER]" : "");
-
-        // Speed bar
-        float speed = transmission.speed_kmh();
-        float speed_frac = std::fmin(speed / 350.0f, 1.0f);
-        ImGui::Text("Speed");
-        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.3f, 0.5f, 1.0f, 1.0f));
-        ImGui::ProgressBar(speed_frac, ImVec2(-1, 20), "");
-        ImGui::PopStyleColor();
-        ImGui::Text("%.0f km/h", speed);
-
-        // Fixed-height status line (no layout bounce)
-        if (transmission.afterfire() > 0.01f) {
-            ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), "BACKFIRE %.0f%%",
-                transmission.afterfire() * 100.0f);
-        } else {
-            ImGui::TextColored(ImVec4(0, 0, 0, 0), "."); // Invisible placeholder
+        // --- Audio sync ---
+        {
+            std::lock_guard<std::mutex> lock(audio_state.mutex);
+            audio_state.params.rpm = state.smoothed_rpm;
+            audio_state.params.throttle = state.throttle;
+            audio_state.params.load = state.load;
+            audio_state.throttle = state.throttle;
+            audio_state.dt = dt;
+            audio_state.afterfire_level = state.afterfire;
+            audio_state.engine_running = state.engine_on;
         }
+        audio_state.mixer.set_master_volume(master_volume);
 
-        ImGui::Spacing();
+        // --- GUI ---
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplSDL2_NewFrame();
+        ImGui::NewFrame();
 
-        // Gear display
-        ImGui::PushFont(nullptr); // Use default font but larger
-        char gear_str[8];
-        std::snprintf(gear_str, sizeof(gear_str), "%d", transmission.gear());
-        ImGui::Text("Gear:");
-        ImGui::SameLine();
-        ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.4f, 1.0f), "%s / %d",
-            gear_str, (int)current_car_config().gear_ratios.size());
-        ImGui::SameLine(250);
-        if (ImGui::Button("Down [A]"))
+        sim_gui_controls(state, car_list, master_volume);
+        sim_gui_telemetry(state);
+
+        // --- Handle GUI shift buttons (encoded as special car_switch_target values) ---
+        if (state.car_switch_target == -2) {
             transmission.shift_down();
-        ImGui::SameLine();
-        if (ImGui::Button("Up [D]"))
+            state.car_switch_target = -1;
+        } else if (state.car_switch_target == -3) {
             transmission.shift_up();
-        ImGui::PopFont();
-
-        ImGui::Spacing();
-
-        // Throttle slider (directly controls engine torque via physics model)
-        ImGui::Text("Throttle [W/S or drag slider]");
-        float throttle_pct = throttle * 100.0f;
-        if (ImGui::SliderFloat("##throttle", &throttle_pct, 0.0f, 100.0f, "%.0f%%")) {
-            throttle = throttle_pct / 100.0f;
+            state.car_switch_target = -1;
         }
 
-        ImGui::Spacing();
-
-        // Physics tuning (always applied, survives car switch)
-        ImGui::Text("Physics Tuning");
-        ImGui::SliderFloat("Load (Nm)", &load_nm, 0.0f, 500.0f, "%.0f");
-        ImGui::SliderFloat("Engine Brake", &engine_brake_nm, 10.0f, 200.0f, "%.0f Nm");
-        ImGui::SliderFloat("Road Drag", &road_coeff, 0.05f, 1.0f, "%.2f");
-        // Apply engine_brake and road_coeff every frame (survives car switch)
-        transmission.set_engine_brake(engine_brake_nm);
-        transmission.set_road_load_coeff(road_coeff);
-        // NOTE: external_load is set in physics update (includes brake force)
-        if (braking)
-            ImGui::TextColored(ImVec4(1, 0.3f, 0.3f, 1), "BRAKE [S] (+400Nm)");
-        else
-            ImGui::Text("S=brake, W=gas");
-
-        ImGui::Spacing();
-
-        // Volume
-        float vol_pct = audio_state.mixer.master_volume() * 100.0f;
-        if (ImGui::SliderFloat("Volume", &vol_pct, 0.0f, 100.0f, "%.0f%%")) {
-            audio_state.mixer.set_master_volume(vol_pct / 100.0f);
+        // --- Handle car switch ---
+        if (state.car_switch_requested) {
+            state.engine_on = false;
+            prev_engine_on = false;
+            SDL_PauseAudioDevice(audio_dev, 1);
+            state.current_car = state.car_switch_target;
+            load_car(car_list[state.current_car].second, audio_state,
+                transmission, pulse_sample, 512);
+            state.car_switch_requested = false;
+            state.car_switch_target = -1;
         }
-
-        ImGui::Separator();
-        ImGui::Text("Keyboard: W=gas S=brake E=engine D/A=shift Q=quit");
-
-        ImGui::End();
-
-        // --- Plot window (fixed position) ---
-        ImGui::SetNextWindowPos(ImVec2(420, 10), ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImVec2(850, 700), ImGuiCond_Always);
-        ImGui::Begin("Engine Telemetry", nullptr,
-            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
-
-        if (ImPlot::BeginPlot("RPM", ImVec2(-1, 200))) {
-            ImPlot::SetupAxes("Time", "RPM");
-            ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 10000, ImPlotCond_Always);
-            ImPlot::SetupAxisLimits(ImAxis_X1, 0, PlotHistory::kMaxSize, ImPlotCond_Always);
-            ImPlot::PlotLine("RPM", rpm_history.data, rpm_history.count);
-            ImPlot::EndPlot();
-        }
-
-        if (ImPlot::BeginPlot("Throttle & Load", ImVec2(-1, 200))) {
-            ImPlot::SetupAxes("Time", "%");
-            ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 110, ImPlotCond_Always);
-            ImPlot::SetupAxisLimits(ImAxis_X1, 0, PlotHistory::kMaxSize, ImPlotCond_Always);
-            ImPlot::PlotLine("Throttle", throttle_history.data, throttle_history.count);
-            ImPlot::PlotLine("Load", load_history.data, load_history.count);
-            ImPlot::EndPlot();
-        }
-
-        if (ImPlot::BeginPlot("Speed", ImVec2(-1, 150))) {
-            ImPlot::SetupAxes("Time", "km/h");
-            ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 350, ImPlotCond_Always);
-            ImPlot::SetupAxisLimits(ImAxis_X1, 0, PlotHistory::kMaxSize, ImPlotCond_Always);
-            ImPlot::PlotLine("Speed", speed_history.data, speed_history.count);
-            ImPlot::EndPlot();
-        }
-
-        ImGui::End();
 
         // --- Render ---
         ImGui::Render();
@@ -409,7 +220,7 @@ int main(int, char**)
         SDL_GL_SwapWindow(window);
     }
 
-    // Cleanup
+    // --- Cleanup ---
     SDL_PauseAudioDevice(audio_dev, 1);
     SDL_CloseAudioDevice(audio_dev);
 
