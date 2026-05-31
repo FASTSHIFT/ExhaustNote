@@ -23,6 +23,7 @@ set(IMPLOT_SOURCES
 
 add_executable(exhaust_sim_gui
     main.cpp
+    sim_app.cpp
     sim_input.cpp
     sim_physics.cpp
     sim_gui.cpp
