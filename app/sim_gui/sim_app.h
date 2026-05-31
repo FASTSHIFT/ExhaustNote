@@ -76,6 +76,7 @@ private:
     bool init_sdl(const Config& cfg);
     bool init_audio(const Config& cfg);
     void init_audio_state();
+    void load_backfire_for_car(const std::string& json_path);
     void shutdown();
 
     // SDL
@@ -88,6 +89,7 @@ private:
     AudioState audio_state_;
     Transmission transmission_;
     std::vector<std::pair<std::string, std::string>> car_list_;
+    std::string cars_dir_;
     float master_volume_ = 0.8f;
     bool running_ = false;
     bool prev_engine_on_ = false;

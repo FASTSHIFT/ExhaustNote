@@ -65,10 +65,11 @@ bool SimApp::init(const Config& cfg)
     // --- Audio state setup ---
     init_audio_state();
     generate_combustion_pulse(pulse_sample_, 512);
-    load_backfire_sample(std::string(cfg.cars_dir) + "/backfire/backfireEXT_1.wav", audio_state_);
+    cars_dir_ = cfg.cars_dir;
 
-    // --- Load first car ---
+    // --- Load first car (also loads per-car backfire samples) ---
     load_car(car_list_[0].second, audio_state_, transmission_, pulse_sample_, 512);
+    load_backfire_for_car(car_list_[0].second);
 
     // --- SDL + OpenGL ---
     if (!init_sdl(cfg))
@@ -270,6 +271,37 @@ void SimApp::switch_car(int index)
     SDL_PauseAudioDevice(audio_dev_, 1);
     state_.current_car = index;
     load_car(car_list_[index].second, audio_state_, transmission_, pulse_sample_, 512);
+    load_backfire_for_car(car_list_[index].second);
+}
+
+void SimApp::load_backfire_for_car(const std::string& json_path)
+{
+    // Clear previous backfire samples
+    audio_state_.backfire_samples.clear();
+
+    // Car directory = json_path minus "/car.json"
+    std::string car_dir = json_path.substr(0, json_path.rfind('/'));
+
+    // Try loading backfireext_1..10 from the car's own directory
+    for (int i = 1; i <= 10; ++i) {
+        std::string path = car_dir + "/backfireext_" + std::to_string(i) + ".wav";
+        if (!load_backfire_sample(path, audio_state_))
+            break;
+    }
+
+    // Fallback: if car has no backfire, try shared backfire/ directory
+    if (audio_state_.backfire_samples.empty()) {
+        std::string fallback_dir = cars_dir_ + "/backfire/";
+        for (int i = 1; i <= 10; ++i) {
+            std::string path = fallback_dir + "backfireEXT_" + std::to_string(i) + ".wav";
+            if (!load_backfire_sample(path, audio_state_))
+                break;
+        }
+    }
+
+    if (!audio_state_.backfire_samples.empty()) {
+        std::printf("  Backfire: %zu variants\n", audio_state_.backfire_samples.size());
+    }
 }
 
 void SimApp::shutdown()

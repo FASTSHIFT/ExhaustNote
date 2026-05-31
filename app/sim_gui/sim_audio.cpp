@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 namespace exhaust {
@@ -31,12 +32,11 @@ void generate_combustion_pulse(sample_t* buffer, size_t length)
 
 bool load_backfire_sample(const std::string& path, AudioState& audio_state)
 {
-    if (!load_wav_mono(path, audio_state.backfire_sample)) {
-        std::printf("  No backfire sample (optional)\n");
+    std::vector<sample_t> sample;
+    if (!load_wav_mono(path, sample)) {
         return false;
     }
-    std::printf("  Backfire sample loaded (%.1fs)\n",
-        audio_state.backfire_sample.size() / 44100.0f);
+    audio_state.backfire_samples.push_back(std::move(sample));
     return true;
 }
 
@@ -171,17 +171,20 @@ void audio_callback(void* userdata, Uint8* stream, int len)
     }
     state->mixer.add(pulse_buf, frames, 1.0f);
 
-    // Backfire one-shot playback
+    // Backfire one-shot playback (random variant selection)
     if (state->afterfire_level > 0.3f && !state->backfire_playing
-        && !state->backfire_sample.empty()) {
+        && !state->backfire_samples.empty()) {
         state->backfire_playing = true;
         state->backfire_pos = 0;
+        // Pick a random backfire variant
+        state->backfire_current = static_cast<size_t>(rand()) % state->backfire_samples.size();
     }
-    if (state->backfire_playing && !state->backfire_sample.empty()) {
+    if (state->backfire_playing && !state->backfire_samples.empty()) {
         sample_t bf_buf[2048] = {};
-        size_t bf_len = state->backfire_sample.size();
+        auto& bf_sample = state->backfire_samples[state->backfire_current];
+        size_t bf_len = bf_sample.size();
         for (size_t i = 0; i < frames && state->backfire_pos < bf_len; ++i) {
-            bf_buf[i] = state->backfire_sample[state->backfire_pos++];
+            bf_buf[i] = bf_sample[state->backfire_pos++];
         }
         if (state->backfire_pos >= bf_len) {
             state->backfire_playing = false;

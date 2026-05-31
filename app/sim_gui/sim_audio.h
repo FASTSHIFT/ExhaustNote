@@ -28,9 +28,10 @@ struct AudioState {
     float dt = 0.016f;
     bool engine_running = false;
 
-    // Backfire one-shot
-    std::vector<sample_t> backfire_sample;
+    // Backfire one-shot (multiple variants, randomly selected)
+    std::vector<std::vector<sample_t>> backfire_samples;
     size_t backfire_pos = 0;
+    size_t backfire_current = 0; ///< Index of currently playing sample
     bool backfire_playing = false;
     float afterfire_level = 0.0f;
 };
