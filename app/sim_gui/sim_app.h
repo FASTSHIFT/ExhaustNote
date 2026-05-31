@@ -28,7 +28,7 @@ public:
 
     struct Config {
         const char* title = "ExhaustNote Simulator";
-        const char* cars_dir = "/tmp/ac_cars";
+        const char* cars_dir = "cars";
         int window_w = 1280;
         int window_h = 720;
         int audio_freq = 44100;

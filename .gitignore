@@ -98,3 +98,6 @@ platform/at32/AT_SURF_F437_V1.1/
 
 # SD card audio resources (WAV files too large for git)
 sdcard/
+
+# Car sound resources (generate with tools/generate_demo_cars.py)
+cars/
