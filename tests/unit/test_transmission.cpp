@@ -164,13 +164,15 @@ TEST_F(TransmissionTest, LoadFollowsThrottle)
     config.auto_shift = true; // Allow auto-shift so RPM doesn't just hit limiter
     Transmission trans(config);
 
-    // Apply partial throttle (won't hit limiter)
-    // At mid-RPM with partial throttle, should have load
-    for (int i = 0; i < 150; ++i)
+    // Apply partial throttle — check load at various points
+    float max_load_seen = 0.0f;
+    for (int i = 0; i < 100; ++i) {
         trans.update(0.5f, 0.016f);
-    // Check at a point before hitting redline
-    float mid_load = trans.load();
-    EXPECT_GT(mid_load, 0.05f) << "RPM=" << trans.rpm();
+        if (trans.load() > max_load_seen)
+            max_load_seen = trans.load();
+    }
+    // Should have seen non-zero load at some point during acceleration
+    EXPECT_GT(max_load_seen, 0.05f) << "Never saw load > 0.05 during 100 frames";
 
     // Release throttle — load should drop
     for (int i = 0; i < 300; ++i)

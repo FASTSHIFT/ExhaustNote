@@ -128,11 +128,12 @@ void Transmission::update(float throttle, float dt)
     float road_load = external_load_ * road_load_coeff_ * rpm_normalized * rpm_normalized;
 
     // --- Net torque and angular acceleration ---
-    float net_torque = combustion_torque - friction_torque - engine_brake - road_load;
+    float net_torque = combustion_torque - friction_torque - engine_brake - road_load - brake_torque_;
 
-    // Sign of friction opposes motion
-    if (omega > 0.0f && net_torque < -friction_torque) {
-        net_torque = -friction_torque;
+    // Prevent friction from reversing the engine (but allow brake/engine_brake to decelerate)
+    float max_decel_torque = friction_torque + engine_brake + brake_torque_ + road_load;
+    if (omega > 0.0f && net_torque < -max_decel_torque) {
+        net_torque = -max_decel_torque;
     }
 
     // Angular acceleration: α = τ / I_effective

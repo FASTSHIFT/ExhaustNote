@@ -13,12 +13,11 @@ void sim_physics_update(SimState& state, Transmission& trans, float dt)
     trans.set_engine_brake(state.physics.engine_brake_nm);
     trans.set_road_load_coeff(state.physics.road_coeff);
 
-    // External load: base load + brake force if braking
-    if (state.braking) {
-        trans.set_external_load(state.physics.load_nm + state.physics.brake_force_nm);
-    } else {
-        trans.set_external_load(state.physics.load_nm);
-    }
+    // External load (affects inertia + road drag)
+    trans.set_external_load(state.physics.load_nm);
+
+    // Brake torque (pure resistance, does NOT affect inertia)
+    trans.set_brake_torque(state.braking ? state.physics.brake_force_nm : 0.0f);
 
     // Step the transmission physics
     trans.update(state.throttle, dt);

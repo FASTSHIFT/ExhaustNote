@@ -86,6 +86,10 @@ public:
     void set_road_load_coeff(float c) { road_load_coeff_ = c; }
     float road_load_coeff() const { return road_load_coeff_; }
 
+    /// Set brake torque (Nm). Applied as pure resistance without affecting inertia.
+    void set_brake_torque(float nm) { brake_torque_ = nm; }
+    float brake_torque() const { return brake_torque_; }
+
     /// Manual shift up.
     void shift_up();
 
@@ -112,6 +116,7 @@ private:
     // External load (drivetrain resistance)
     float external_load_ = 0.0f;
     float road_load_coeff_ = 0.3f; ///< Road load multiplier (0.1=light, 0.3=normal, 0.6=heavy)
+    float brake_torque_ = 0.0f; ///< Brake pedal torque (pure resistance, no inertia effect)
 
     // Rev limiter state
     bool rev_limiter_active_ = false;

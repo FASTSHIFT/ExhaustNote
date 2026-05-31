@@ -83,7 +83,7 @@ TEST_F(SimPhysicsTest, PhysicsConfigApplied)
     EXPECT_FLOAT_EQ(trans.road_load_coeff(), 0.8f);
 }
 
-TEST_F(SimPhysicsTest, BrakeAddsExtraLoad)
+TEST_F(SimPhysicsTest, BrakeAppliesBrakeTorque)
 {
     state.throttle = 0.0f;
     state.braking = true;
@@ -92,8 +92,9 @@ TEST_F(SimPhysicsTest, BrakeAddsExtraLoad)
 
     sim_physics_update(state, trans, 0.016f);
 
-    // External load should be load_nm + brake_force_nm
-    EXPECT_FLOAT_EQ(trans.external_load(), 600.0f);
+    // Brake torque applied independently (doesn't inflate external_load)
+    EXPECT_FLOAT_EQ(trans.external_load(), 200.0f); // Unchanged
+    EXPECT_FLOAT_EQ(trans.brake_torque(), 400.0f); // Brake applied separately
 }
 
 TEST_F(SimPhysicsTest, NoBrakeNormalLoad)
