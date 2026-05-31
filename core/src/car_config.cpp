@@ -1,5 +1,6 @@
 #include "core/car_config.h"
 
+#include <algorithm>
 #include <cJSON.h>
 #include <cstdio>
 #include <cstring>
@@ -142,6 +143,11 @@ std::vector<std::pair<std::string, std::string>> scan_cars(const std::string& ca
     }
 
     closedir(dir);
+
+    // Sort alphabetically by display name
+    std::sort(result.begin(), result.end(),
+        [](const auto& a, const auto& b) { return a.first < b.first; });
+
     return result;
 }
 #else
