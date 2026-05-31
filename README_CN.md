@@ -106,21 +106,46 @@ cmake --build build/sim --target exhaust_sim_gui -j$(nproc)
 ./build/sim/app/sim_gui/exhaust_sim_gui
 ```
 
+### 准备声音资源
+
+ExhaustNote 需要每辆车的 WAV 音频文件。有两种获取方式：
+
+#### 方式 A：合成 Demo 声音（无需外部数据）
+
+```bash
+python3 tools/generate_demo_cars.py
+# 在 cars/ 下生成 6 辆合成引擎声音包
+# 基于点火时序的脉冲合成，无版权问题
+```
+
+#### 方式 B：从 FMOD SoundBank 文件提取
+
+许多游戏和音频工具使用 [FMOD](https://www.fmod.com/) 的 `.bank` 文件（内部为 FSB5 容器格式）存储声音。如果你合法持有包含引擎声音的 `.bank` 文件，可以提取：
+
+```bash
+pip install fsb5
+python3 tools/extract_fmod_bank.py /path/to/bank/files cars/
+python3 tools/build_car_configs.py  # 自动为每辆车生成 car.json
+```
+
+> ⚠️ **版权声明**：提取的音频样本可能受其所有者版权保护。**请勿**分发从商业产品中提取的 WAV 文件。`cars/` 目录已被 gitignore 正是出于此原因。这些工具仅供个人学习/研究使用。
+
 ### 准备 SD 卡
 
-格式化为 FAT32，创建目录结构：
+格式化为 FAT32，将 `cars/` 目录复制到 SD 卡根目录：
 ```
-SD:/ExhaustNote/
+SD:/cars/
 ├── ferrari_458/
 │   ├── car.json
 │   ├── F4CH_IDLE_EXT.wav
 │   ├── ext_on3500.wav
 │   └── ...
-├── shelby_cobra_427sc/
+├── demo_v8_muscle/
 │   ├── car.json
-│   └── ...
+│   ├── on_750.wav ... on_6800.wav
+│   └── off_750.wav ... off_6800.wav
 └── backfire/
-    └── backfireEXT_*.wav
+    └── backfireEXT_1.wav
 ```
 
 ## 音频处理流水线

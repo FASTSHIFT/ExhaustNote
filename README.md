@@ -106,12 +106,29 @@ cmake --build build/sim --target exhaust_sim_gui -j$(nproc)
 ./build/sim/app/sim_gui/exhaust_sim_gui
 ```
 
-### Generate Demo Cars (no AC needed)
+### Prepare Sound Resources
+
+ExhaustNote needs WAV audio files for each car. There are two ways to get them:
+
+#### Option A: Generate synthetic demo sounds (no external data needed)
 
 ```bash
 python3 tools/generate_demo_cars.py
 # Creates cars/ with 6 synthetic engine sound packs
+# Uses firing-order-based pulse synthesis — no copyright issues
 ```
+
+#### Option B: Extract from FMOD SoundBank files
+
+Many games and audio tools store sounds in [FMOD](https://www.fmod.com/) `.bank` files (FSB5 container format). If you have legally obtained `.bank` files containing engine sounds, you can extract them:
+
+```bash
+pip install fsb5
+python3 tools/extract_fmod_bank.py /path/to/bank/files cars/
+python3 tools/build_car_configs.py  # Auto-generate car.json for each car
+```
+
+> ⚠️ **Copyright Notice**: Extracted audio samples may be copyrighted by their respective owners. Do **NOT** redistribute extracted WAV files from commercial products. The `cars/` directory is gitignored for this reason. These tools are provided for personal/educational use only.
 
 ### Prepare SD Card
 
