@@ -12,6 +12,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Install dependencies
         run: |
@@ -52,5 +54,9 @@ jobs:
 
       - name: Check formatting
         run: |
-          find core platform app tests -name '*.cpp' -o -name '*.h' | \
+          find core app/sim_gui app/mcu tests platform/include platform/sim \
+            -name '*.cpp' -o -name '*.h' -o -name '*.c' | \
+            grep -v 'platform/at32/Artery' | \
+            grep -v 'platform/at32/bsp' | \
+            grep -v 'third_party' | \
             xargs clang-format --dry-run --Werror
