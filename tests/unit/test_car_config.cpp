@@ -1,7 +1,10 @@
 #include "core/car_config.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
+#include <unistd.h>
+
 #include <gtest/gtest.h>
 
 using namespace exhaust;
@@ -82,10 +85,20 @@ TEST(CarConfigTest, LoadInvalidJson)
 
 TEST(CarConfigTest, ScanCarsDirectory)
 {
-    // /tmp/ac_cars should have car.json files from our test setup
-    auto cars = scan_cars("/tmp/ac_cars");
-    // Should find at least the Ferrari 458
+    // Create a temporary car directory for testing
+    std::string tmp_dir = "/tmp/exhaust_test_cars_" + std::to_string(getpid());
+    std::string car_dir = tmp_dir + "/test_car";
+    system(("mkdir -p " + car_dir).c_str());
+    // Write a minimal car.json
+    FILE* f = fopen((car_dir + "/car.json").c_str(), "w");
+    fprintf(f, "{\"name\":\"Test\",\"cylinders\":4,\"onload\":[]}");
+    fclose(f);
+
+    auto cars = scan_cars(tmp_dir);
     EXPECT_GE(cars.size(), 1u);
+
+    // Cleanup
+    system(("rm -rf " + tmp_dir).c_str());
 
     // Each entry should have a non-empty name and valid path
     for (auto& [name, path] : cars) {

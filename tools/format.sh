@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# Auto-format all C++ source files using clang-format.
-# Uses the .clang-format config at the project root (WebKit style).
+# Auto-format project C/C++ source files using clang-format.
+# Uses the .clang-format config at the project root.
+#
+# Usage:
+#   ./tools/format.sh          # Format in-place
+#   ./tools/format.sh --check  # Dry-run check (for CI, exits non-zero on diff)
 
 set -euo pipefail
 
@@ -9,14 +13,31 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 cd "$PROJECT_ROOT"
 
-# Format project code only (exclude third-party: AT32 SDK, BSP, Artery, cJSON)
-find core app tests tools platform/include platform/sim \
-    -type f \( -name '*.cpp' -o -name '*.h' \) \
-    -exec clang-format -i {} +
+# Determine mode
+if [[ "${1:-}" == "--check" ]]; then
+    FORMAT_FLAGS="--dry-run --Werror"
+    echo "Checking format..."
+else
+    FORMAT_FLAGS="-i"
+fi
 
-# Format MCU app code (but not BSP/Artery)
-find app/mcu -maxdepth 1 -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.c' \) \
-    ! -name 'system_call.c' ! -name 'cxx_stubs.cpp' \
-    -exec clang-format -i {} +
+# Collect files (exclude vendor SDK, BSP, third_party)
+FILES=$(find core app tests platform/include platform/sim \
+    -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.c' \) \
+    ! -path '*/platform/at32/Artery/*' \
+    ! -path '*/platform/at32/bsp/*' \
+    ! -path '*/third_party/*' \
+    ! -name 'system_call.c' \
+    2>/dev/null | sort)
 
-echo "Done. All files formatted."
+if [[ -z "$FILES" ]]; then
+    echo "No files to format."
+    exit 0
+fi
+
+# shellcheck disable=SC2086
+echo "$FILES" | xargs clang-format $FORMAT_FLAGS
+
+if [[ "${1:-}" != "--check" ]]; then
+    echo "Done. All files formatted."
+fi

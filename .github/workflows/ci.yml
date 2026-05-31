@@ -53,10 +53,4 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang-format
 
       - name: Check formatting
-        run: |
-          find core app/sim_gui app/mcu tests platform/include platform/sim \
-            -name '*.cpp' -o -name '*.h' -o -name '*.c' | \
-            grep -v 'platform/at32/Artery' | \
-            grep -v 'platform/at32/bsp' | \
-            grep -v 'third_party' | \
-            xargs clang-format --dry-run --Werror
+        run: ./tools/format.sh --check

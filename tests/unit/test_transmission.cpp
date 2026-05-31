@@ -108,6 +108,7 @@ TEST_F(TransmissionTest, CannotShiftBelowFirst)
 
 TEST_F(TransmissionTest, CannotShiftAboveMax)
 {
+    config.auto_shift = true; // Need auto_shift for shift_up to clear shifting_ via update
     Transmission trans(config);
 
     // Shift to top gear
@@ -125,6 +126,7 @@ TEST_F(TransmissionTest, AutoUpshift)
 {
     // Use a config where auto-upshift triggers
     Transmission::Config auto_config = config;
+    auto_config.auto_shift = true; // Explicitly enable auto-shift for this test
     auto_config.rpm_downshift = 0.05f; // Very low downshift threshold
     auto_config.rpm_upshift = 0.80f;
     Transmission trans(auto_config);
@@ -159,6 +161,7 @@ TEST_F(TransmissionTest, Reset)
 
 TEST_F(TransmissionTest, LoadFollowsThrottle)
 {
+    config.auto_shift = true; // Allow auto-shift so RPM doesn't just hit limiter
     Transmission trans(config);
 
     // Apply partial throttle (won't hit limiter)
