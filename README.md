@@ -79,9 +79,9 @@ ExhaustNote/
 │   └── sim_gui/            # Desktop simulator (ImGui + SDL2)
 ├── platform/at32/          # BSP, HAL drivers, FatFS, Arduino Core
 ├── tests/                  # Google Test unit tests
-├── tools/                  # flash.sh, format.sh, ATLink programmer
+├── tools/                  # flash.sh, format.sh, generate_demo_cars.py
 ├── docs/                   # Post-mortems, design notes
-└── sdcard/                 # SD card contents (WAV + car.json per car)
+└── cars/                   # Car sound packs (shared: sim + SD card)
 ```
 
 ## Quick Start
@@ -106,21 +106,29 @@ cmake --build build/sim --target exhaust_sim_gui -j$(nproc)
 ./build/sim/app/sim_gui/exhaust_sim_gui
 ```
 
+### Generate Demo Cars (no AC needed)
+
+```bash
+python3 tools/generate_demo_cars.py
+# Creates cars/ with 6 synthetic engine sound packs
+```
+
 ### Prepare SD Card
 
-Format as FAT32, create directory structure:
+Format as FAT32, copy `cars/` directory to SD root:
 ```
-SD:/ExhaustNote/
+SD:/cars/
 ├── ferrari_458/
 │   ├── car.json
 │   ├── F4CH_IDLE_EXT.wav
 │   ├── ext_on3500.wav
 │   └── ...
-├── shelby_cobra_427sc/
+├── demo_v8_muscle/
 │   ├── car.json
-│   └── ...
+│   ├── on_750.wav ... on_6800.wav
+│   └── off_750.wav ... off_6800.wav
 └── backfire/
-    └── backfireEXT_*.wav
+    └── backfireEXT_1.wav
 ```
 
 ## Audio Pipeline

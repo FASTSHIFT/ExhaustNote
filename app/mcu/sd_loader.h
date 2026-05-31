@@ -32,7 +32,7 @@ typedef struct {
 
 /// Load a WAV file from SD card into a pre-allocated buffer.
 /// Converts stereo to mono (left channel) if needed.
-/// @param path       FatFS path (e.g. "1:/ExhaustNote/ferrari_458/ext_on3500.wav")
+/// @param path       FatFS path (e.g. "1:/cars/ferrari_458/ext_on3500.wav")
 /// @param buf        Output buffer for mono int16 PCM samples
 /// @param buf_max    Maximum number of samples the buffer can hold
 /// @param info       [out] WAV file info (sample rate, etc.)
@@ -52,7 +52,7 @@ typedef struct {
 } sd_car_entry_t;
 
 /// Scan a directory for car subdirectories (those containing car.json).
-/// @param base_dir   FatFS path to scan (e.g. "1:/ExhaustNote")
+/// @param base_dir   FatFS path to scan (e.g. "1:/cars")
 /// @param entries    Output array of car entries
 /// @param max_entries Maximum entries to return
 /// @return Number of cars found

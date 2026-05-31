@@ -72,7 +72,7 @@ static LoadedCar g_car;
 
 // Car list (scanned from SD card)
 #define MAX_CARS 16
-#define CAR_BASE_DIR "1:/ExhaustNote"
+#define CAR_BASE_DIR "1:/cars"
 static sd_car_entry_t g_car_list[MAX_CARS];
 static uint8_t g_car_count = 0;
 static uint8_t g_car_index = 0;

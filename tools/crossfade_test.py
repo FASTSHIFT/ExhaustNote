@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Quick crossfade test using extracted Assetto Corsa Ferrari 458 samples.
+Quick crossfade test using extracted engine sound samples.
 Generates a WAV file with RPM sweep from idle to redline using multi-layer crossfade.
 
 LEGAL NOTICE:
@@ -17,16 +17,16 @@ import os
 import struct
 
 SAMPLE_RATE = 44100
-OUTPUT_FILE = "/tmp/ac_ferrari_458/crossfade_sweep.wav"
+OUTPUT_FILE = "/tmp/crossfade_sweep.wav"
 
 # Layer definitions: (filename, RPM)
-# Using external onload samples from Ferrari 458
+# Point these to your extracted engine sound WAVs
 LAYERS = [
-    ("/tmp/ac_ferrari_458/F4CH_IDLE_EXT.wav", 900),
-    ("/tmp/ac_ferrari_458/ext_on3500.wav", 3500),
-    ("/tmp/ac_ferrari_458/ext_on5000.wav", 5000),
-    ("/tmp/ac_ferrari_458/ext_on6750.wav", 6750),
-    ("/tmp/ac_ferrari_458/ext_on8500.wav", 8500),
+    ("cars/demo_v8_muscle/on_750.wav", 750),
+    ("cars/demo_v8_muscle/on_2500.wav", 2500),
+    ("cars/demo_v8_muscle/on_4000.wav", 4000),
+    ("cars/demo_v8_muscle/on_5500.wav", 5500),
+    ("cars/demo_v8_muscle/on_6800.wav", 6800),
 ]
 
 
